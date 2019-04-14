@@ -1,7 +1,8 @@
 (ns numthy.polynomial
   (:require [clojure.string :refer [join]]
             [numthy.modular-arithmetic :refer [mod-inverse]]
-            [numthy.helpers :refer [prime?]]))
+            [numthy.helpers :refer [prime? factors]]
+            [clojure.math.numeric-tower :as tower]))
 
 (comment
   "To use these functions, represent polynomials as maps with powers as keys
@@ -237,13 +238,16 @@
                                     (*' coeff power)})))
              {} (poly-trim pnml)))
 
-(defn quadratic-zeroes
-  "Given a quadratic polynomial, find its real-valued zeroes (nil if none)."
+;; ROOT-FINDING
+
+(defn quadratic-roots
+  "Given a quadratic polynomial, use the quadratic formula to find its
+  real-valued zeroes (nil if none)."
   [pnml]
   (when (= 2 (degree pnml))
-    (let [{a 2, b 1, c 0} pnml
-          discriminant    (-> (*' b b)
-                              (- (* 4 a c)))]
+    (let [a (get pnml 2 0) b (get pnml 1 0) c (get pnml 0 0)
+          discriminant (-> (*' b b)
+                           (- (* 4 a c)))]
       (cond
         (pos? discriminant)  [(-> (- b) (+ (Math/sqrt discriminant))
                                   (/ (* 2 a)))
@@ -252,4 +256,34 @@
         (zero? discriminant) [(-> (- b) (/ (* 2 a)))]
         :else nil))))
 
-;; TODO: Synthetic division to find roots of general polynomials
+(defn- possible-roots
+  "Uses the Rational Root Theorem to generate all possible rational roots of a polynomial."
+  [pnml]
+  (if-let [constant (get pnml 0)]
+    (->> (for [p (factors (tower/abs constant))
+               q (factors (tower/abs (lc pnml)))]
+           [(/ p q) (- (/ p q))])
+         (apply concat)
+         (into (sorted-set)))
+    #{0}))
+
+(defn- root?
+  "r is a root of a polynomial if no remainder is left after dividing pnml / (x - r)."
+  [pnml r]
+  (empty? (poly-rem pnml {1 1, 0 (- r)})))
+
+(defn roots
+  "For polynomials of degree ≧ 2, iteratively finds roots and factors the polynomial
+  down to a quadratic equation to find the final roots. Solves polynomials of degree 1
+  directly. Returns only real roots, or nil if none. Returns nil if polynomial is
+  of degree 0."
+  [pnml]
+  (loop [pnml  pnml
+         roots (sorted-set)]
+    (condp = (degree pnml)
+      0 nil
+      1 (conj roots (/ (get pnml 0 0) (- (get pnml 1))))
+      2 (into roots (quadratic-roots pnml))
+      (let [winners (filter #(root? pnml %) (possible-roots pnml))]
+        (recur (:quotient (div pnml {1 1, 0 (- (first winners))}))
+               (into roots winners))))))
