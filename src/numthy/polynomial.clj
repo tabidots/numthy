@@ -1,6 +1,7 @@
 (ns numthy.polynomial
   (:require [clojure.string :refer [join]]
-            [numthy.modular-arithmetic :refer [mod-inverse]]))
+            [numthy.modular-arithmetic :refer [mod-inverse]]
+            [numthy.helpers :refer [prime?]]))
 
 (comment
   "To use these functions, represent polynomials as maps with powers as keys
@@ -11,7 +12,7 @@
 
 ;; BASIC UTILITY FUNCTIONS
 
-(defn poly-trim-
+(defn- poly-trim
   "Removes terms with zero coefficients from a polynomial."
   [pnml]
   (->> (filter #(zero? (get pnml %)) (keys pnml))
@@ -20,12 +21,14 @@
 (defn degree
   "Finds the degree (power of highest-power term) of a polynomial."
   [pnml]
-  (apply max (keys pnml)))
+  (let [p (poly-trim pnml)]
+    (if (empty? p) ##-Inf ;; the degree of the zero polynomial is −∞
+      (apply max (keys p)))))
 
 (defn lc
   "Leading coefficient (coefficient of highest-power term) of a polynomial."
   [pnml]
-  (get pnml (degree pnml)))
+  (get pnml (degree (poly-trim pnml))))
 
 (defn monic?
   "Tests if a polynomial is monic (that is, its leading coefficient is 1)."
@@ -34,7 +37,7 @@
 
 ;; SYMBOLIC REPRESENTATION
 
-(defn print-term-
+(defn- print-term
   "Prints a conventional symbolic representation of a single term in a polynomial."
   [power coeff]
   (let [x (cond
@@ -51,12 +54,12 @@
 (defn poly-print
   "Prints a conventional symbolic representation of a polynomial."
   [pnml]
-  (let [trimmed (poly-trim- pnml)]
+  (let [trimmed (poly-trim pnml)]
     (if (empty? trimmed) "0"
       (->> trimmed
            (sort)
            (reverse)
-           (map (partial apply print-term-))
+           (map (partial apply print-term))
            (join " + ")))))
 
 ;; BASIC ARITHMETIC OPERATIONS
@@ -64,7 +67,7 @@
 (defn add
   "Adds two polynomials."
   [p1 p2]
-  (poly-trim- (merge-with + p1 p2)))
+  (poly-trim (merge-with + p1 p2)))
 
 (defn mul
   "Multiplies two polynomials."
@@ -73,13 +76,13 @@
          {(+ powers1 powers2)
           (*' (get p1 powers1) (get p2 powers2))})
        (reduce #(merge-with + %1 %2) {})
-       poly-trim-))
+       poly-trim))
 
 (defn sub
   "Subtracts polynomial p2(x) from polynomial p1(x)."
   [p1 p2]
   (let [neg-p2 (mul p2 {0 -1})]
-    (poly-trim- (add p1 neg-p2))))
+    (poly-trim (add p1 neg-p2))))
 
 (comment
   "(x^2 + 2x + 1) * (x + 1) =  x^3 + 3x^2 + 3x + 1"
@@ -87,7 +90,7 @@
 
 ;; LONG DIVISION
 
-(defn poly-quot-
+(defn- poly-quot
   "The quotient of a polynomial p1(x) divided by another p2(x).
   Returns nil if p2 is of a higher degree than p1."
   [p1 p2]
@@ -101,10 +104,10 @@
   Returns nil if p2 is of a higher degree than p1."
   ;; http://www.math.ucla.edu/~radko/circles/lib/data/Handout-358-436.pdf
   [p1 p2]
-  (when-let [q (poly-quot- p1 p2)]               ;; sanity check
+  (when-let [q (poly-quot p1 p2)]                ;; sanity check
     (loop [qs q r (->> q (mul p2) (sub p1))]
       (if (empty? r) {:quotient qs :remainder r} ;; divides evenly
-        (if-let [new-q (poly-quot- r p2)]
+        (if-let [new-q (poly-quot r p2)]
           (recur (conj qs new-q)                 ;; divides with remainder
                  (->> new-q (mul p2) (sub r)))
           {:quotient qs :remainder r})))))       ;; can't divide anymore
@@ -126,13 +129,13 @@
   ;; https://en.wikipedia.org/wiki/Cyclotomic_polynomial
   ;; Source: https://medium.com/@sibu.it13/aks-primality-test-f184cf6365a1
   [pnml r]
-  (poly-trim- (reduce-kv (fn [res power coeff]
-                           (merge-with + res {(mod power r) coeff}))
-                         {} pnml)))
+  (poly-trim (reduce-kv (fn [res power coeff]
+                           (merge-with + res {(mod power r) coeff})
+                         {} pnml))))
 
 (comment
+ "Compare times"
  (time (poly-rem (exp {0 1, 1 1} 5) {0 -1, 2 1}))
- "Elapsed time: 0.261586 msecs"
  (time (quick-poly-rem (exp {0 1, 1 1} 5) 2)))
 
 ;; MODULAR ARITHMETIC
@@ -184,8 +187,8 @@
       ;; "inner loop".
       (letfn [(basis-pnml [xi]
                 (let [top (reduce (fn [res xj]
-                                     (if (= xi xj) res
-                                       (mul res {1 1, 0 (- xj)})))
+                                    (if (= xi xj) res
+                                      (mul res {1 1, 0 (- xj)})))
                                   {0 1} xs)
                       bot (reduce (fn [res xj]
                                     (if (= xi xj) res
@@ -208,10 +211,10 @@
       (letfn [(mod-basis-pnml [xi]
                 ;; https://www.judosaltgenius.com/2019/02/mod-squad
                 (reduce (fn [res xj]
-                         (if (= xi xj) res
-                           (let [xixj-inv (mod-inverse (- xi xj) m)]
-                             (mul res {1 xixj-inv,
-                                       0 (-> xixj-inv (* (- xj)))}))))
+                          (if (= xi xj) res
+                            (let [xixj-inv (mod-inverse (- xi xj) m)]
+                              (mul res {1 xixj-inv,
+                                        0 (-> xixj-inv (* (- xj)))}))))
                        {0 1} xs))]
         (let [raw (->> (map mod-basis-pnml xs)
                        (map #(mul {0 %1} %2) ys)
@@ -222,3 +225,31 @@
   "Evaluates the value of a given polynomial at a point x, mod m, using Horner's method."
   [pnml x m]
   (-> (poly-eval pnml x) (mod m)))
+
+;; CALCULUS
+
+(defn differentiate
+  "Given P(X), uses the power rule to find P'(X),"
+  [pnml]
+  (reduce-kv (fn [res power coeff]
+               (if (zero? power) res
+                 (merge-with + res {(dec power)
+                                    (*' coeff power)})))
+             {} (poly-trim pnml)))
+
+(defn quadratic-zeroes
+  "Given a quadratic polynomial, find its real-valued zeroes (nil if none)."
+  [pnml]
+  (when (= 2 (degree pnml))
+    (let [{a 2, b 1, c 0} pnml
+          discriminant    (-> (*' b b)
+                              (- (* 4 a c)))]
+      (cond
+        (pos? discriminant)  [(-> (- b) (+ (Math/sqrt discriminant))
+                                  (/ (* 2 a)))
+                              (-> (- b) (- (Math/sqrt discriminant))
+                                  (/ (* 2 a)))]
+        (zero? discriminant) [(-> (- b) (/ (* 2 a)))]
+        :else nil))))
+
+;; TODO: Synthetic division to find roots of general polynomials

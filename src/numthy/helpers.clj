@@ -69,6 +69,8 @@
           (divisible? n k) (recur (/ n k) primes (conj factors k))
           :else            (recur n (rest primes) factors))))))
 
+;; TODO: Reimplement this using hash-maps
+
 (defn prime-powers-integer [n]
   "Returns the exponent vector for the prime power representation of an integer,
   e.g., 168 = 2*2*2*3*7 = 2^3 * 3^1 * 5^0 * 7^1 -> (3 1 0 1)"
@@ -180,3 +182,12 @@
     (if (= 1 (count (distinct pf)))
       (Math/log (first pf))
       0)))
+
+;; SEQUENCES
+
+(defn fibonacci
+  ([]
+   (->> (iterate (fn [[f0 f1]] [f1 (+ f0 f1)]) [0N 1N])
+        (map peek)))
+  ([n]
+   (take n (fibonacci))))

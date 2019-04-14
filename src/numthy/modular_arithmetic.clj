@@ -15,7 +15,7 @@
     (loop [a (mod a m) b b res 0]
       (if (zero? b) res
         (recur (-> (+' a a) (mod m))
-               (bit-shift-right b 1)
+               (.shiftRight (biginteger b) 1)
                (if (odd? b)
                  (-> (+' res a) (mod m))
                  res))))))
@@ -28,7 +28,7 @@
     (loop [base (mod base m) e exp res 1]
       (if (zero? e) res
         (recur (-> (*' base base) (mod m))
-               (bit-shift-right e 1)
+               (.shiftRight (biginteger e) 1)
                (if (odd? e)
                  (-> (*' res base) (mod m))
                  res))))))
@@ -113,10 +113,9 @@
   Φ(p) (i.e., p - 1) is a primitive root mod p."
   ; https://stackoverflow.com/a/26636457/4210855
   [x p]
-  (when (.isProbablePrime (biginteger p) 5)
-    (let [phi (- p 1)
-          pfs (filter h/prime? (h/factors phi))]
-      (not-any? #(= 1 (mod-pow x (/ phi %) p)) pfs))))
+  (let [phi (dec p)
+        pfs (filter h/prime? (h/factors phi))]
+    (not-any? #(= 1 (mod-pow x (/ phi %) p)) pfs)))
 
 (defn cyclic?
   "Returns true if (ℤ/nℤ,×) ≅ C_Φ(n), i.e., the multiplicative group of
@@ -126,33 +125,25 @@
   (when (.isProbablePrime (biginteger n) 5)
     (some #(primitive-root? % n) (range 1 n))))
 
-(defn fibonacci-primitive-root?
-  "Determines if x is a Fibonacci primitive root mod p, where p is prime,
-  which means that not only do the powers of x mod p generate all values in
-  (ℤ/pℤ,×), but x^n + x^(n+1) ≡ x^(n+2) mod p."
-  [x p]
-  (when (primitive-root? x p)
-    (let [ps (powers-of-a-mod-n x p)]
-      (->> (map #(= (-> (+ %1 %2) (mod p)) %3)
-                ps (rest ps) (rest (rest ps)))
-           (every? true?)))))
-
-(->> (range 1 1000)
-     (filter (fn [p]
-               (and (h/prime? p)
-                    (some #(fibonacci-primitive-root? % p) (range 1 p))))))
-
 (defn multiplicative-order
   "ord_n(a), the smallest positive integer k such that a^k ≡ 1 (mod n) where
-  a is coprime to n. a^0 ≡ 1 (mod n) for any n, so the quick way to find k
-  is to count the distinct powers of a (mod n)."
+  a is coprime to n. a^0 ≡ 1 (mod n) for any n. "
   [a n]
   (when (coprime? a n)
-    (count (distinct (powers-of-a-mod-n a n)))))
+    (first (filter #(= 1 (mod-pow a % n)) (rest (range))))))
 
 (comment
-  "Alternative way to test for primitive root-ness. Works for prime and
-  composite moduli, but will be impractically slow for large moduli."
+  "If we know we are dealing with ℤ/pℤ, this is faster."
+  (first (filter #(= 1 (mod-pow a % p)) (pollard-factorize (dec p)))))
+
+(comment
+  "For multiplicative order, a quick way to find k for small n is to count
+  the distinct powers of a (mod n). However, this is intractable for large n."
+  (count (distinct (powers-of-a-mod-n a n))))
+
+(comment
+  "Multiplicative order also enables an alternative test for primitive root-ness.
+  Works for prime and composite moduli, but will be impractically slow for large moduli."
   (= (multiplicative-order x m) (h/phi p)))
 
 (defn pairwise-coprime?
@@ -207,7 +198,7 @@
               ;; equal to half of the Euler totient.
               (cond
                 (and (odd? prime)
-                     (= 1 power)) (- prime 1) ;; speed up calculation
+                     (= 1 power)) (dec prime) ;; speed up calculation
                 (odd? prime)      (h/phi (tower/expt prime power))
                 (> power 2)       (/ (h/phi (tower/expt prime power)) 2)
                 :else             (h/phi (tower/expt prime power))))]
@@ -217,12 +208,11 @@
            (map prime-power-carm)
            (reduce tower/lcm)))))
 
-
-;; TODO: quadratic residue
 ;; TODO: discrete logarithm problem
 ;; https://www.doc.ic.ac.uk/~mrh/330tutor/ch06s02.html
 
 ;; TODO: Brent's cycle finding algorithm
+;; TODO: Pollard-Brent factorization https://maths-people.anu.edu.au/~brent/pd/rpb051i.pdf
 
 ;; TODO: https://en.wikipedia.org/wiki/Carmichael_number
 ;; TODO: https://en.wikipedia.org/wiki/Euler_pseudoprime
@@ -230,30 +220,7 @@
 
 ;; https://en.wikipedia.org/wiki/Congruent_number
 
-(defn fib-mod
-  [coll m]
-  (let [new (-> (reduce + (take-last 2 coll))
-                (mod m))]
-    (conj coll new)))
-
-(defn pisano-period ;; https://en.wikipedia.org/wiki/Pisano_period
-  "The period with which the sequence of Fibonacci numbers (mod n) repeats.
-  e.g. Fibonacci:   [0 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597]
-       Fib (mod 3): [0 1 1 2 0 2 2 1][0  1  1  2  0   2   2   1   0  ][1..]
-       Period:      |-------8-------|"
-  [n]
-  (when (> n 1)
-    (loop [fm (nth (iterate #(fib-mod % n) [0 1]) 2) ;; start with 4 items
-           period 2]
-      (cond
-        (> period 1000) nil                          ;; avoid infinite loops
-        (= (subvec fm 0 period)
-           (subvec fm period (* 2 period))) period   ;; found a cycle
-        :else
-        (recur (nth (iterate #(fib-mod % n) fm) 2)   ;; add 2 fib-numbers
-               (inc period))))))
-
-;; TODO: https://en.wikipedia.org/wiki/Pisano_period#Generalizations
+;; TODO: Dirichlet character https://en.wikipedia.org/wiki/Dirichlet_character
 
 (defn bezout-coefs
   "Given integers a and b, returns just Bézout's coefficients x and y."
