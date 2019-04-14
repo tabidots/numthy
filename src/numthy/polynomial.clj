@@ -240,7 +240,7 @@
 
 ;; ROOT-FINDING
 
-(defn quadratic-roots
+(defn- quadratic-roots
   "Given a quadratic polynomial, use the quadratic formula to find its
   real-valued zeroes (nil if none)."
   [pnml]
@@ -273,10 +273,9 @@
   (empty? (poly-rem pnml {1 1, 0 (- r)})))
 
 (defn roots
-  "For polynomials of degree ≧ 2, iteratively finds roots and factors the polynomial
-  down to a quadratic equation to find the final roots. Solves polynomials of degree 1
-  directly. Returns only real roots, or nil if none. Returns nil if polynomial is
-  of degree 0."
+  "Finds all rational and quadratic roots of a polynomial of arbitrary degree.
+  Cannot return more than two irrational roots. Returns nil if there are no
+  such roots, or if the polynomial is of degree 0."
   [pnml]
   (loop [pnml  pnml
          roots (sorted-set)]
@@ -285,5 +284,10 @@
       1 (conj roots (/ (get pnml 0 0) (- (get pnml 1))))
       2 (into roots (quadratic-roots pnml))
       (let [winners (filter #(root? pnml %) (possible-roots pnml))]
-        (recur (:quotient (div pnml {1 1, 0 (- (first winners))}))
-               (into roots winners))))))
+        (if (empty? winners) ;; No solutions for the current iterations
+          (if (empty? roots) nil roots) ;; Check whether solutions at all
+          (recur (:quotient (div pnml {1 1, 0 (- (first winners))}))
+                 (into roots winners)))))))
+
+;; TODO: cyclotomic polynomials
+;; TODO: irreducible polynomials
