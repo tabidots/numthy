@@ -1,7 +1,7 @@
 (ns numthy.polynomial
   (:require [clojure.string :refer [join]]
             [numthy.modular-arithmetic :refer [mod-inverse]]
-            [numthy.helpers :refer [prime? factors]]
+            [numthy.helpers :refer [prime? factors mobius]]
             [clojure.math.numeric-tower :as tower]))
 
 (comment
@@ -100,7 +100,7 @@
       {(- d1 d2)                ;; power = difference in degree
        (/ (lc p1) (lc p2))})))  ;; coeff = quotient of lc's
 
-(defn div
+(defn long-div
   "Polynomial long division of p1(x) / p2(x).
   Returns nil if p2 is of a higher degree than p1."
   ;; http://www.math.ucla.edu/~radko/circles/lib/data/Handout-358-436.pdf
@@ -112,6 +112,12 @@
           (recur (conj qs new-q)                 ;; divides with remainder
                  (->> new-q (mul p2) (sub r)))
           {:quotient qs :remainder r})))))       ;; can't divide anymore
+
+(defn div
+  "Quotient of P(X) divided either by a rational divisor q or a polynomial Q(X)."
+  [p q]
+  (if (map? q) (long-div p q)
+    (zipmap (keys p) (map #(/ % q) (vals p)))))
 
 (comment
   "(x^2 - 4x + 4) / (x - 1) = (x - 3) with remainder 1."
@@ -195,7 +201,7 @@
                                     (if (= xi xj) res
                                       (*' res (- xi xj))))
                                   1 xs)]
-                  (:quotient (div top {0 bot}))))]
+                  (div top bot)))]
         (->> (map basis-pnml xs)       ;; Generate basis polynomials ℓ_j for each x,y pair
              (map #(mul {0 %1} %2) ys) ;; Scale each basis polynomial ℓ_j by constant y_j}
              (reduce add))))))         ;; Add the scaled basis polynomials
@@ -286,8 +292,33 @@
       (let [winners (filter #(root? pnml %) (possible-roots pnml))]
         (if (empty? winners) ;; No solutions for the current iterations
           (if (empty? roots) nil roots) ;; Check whether solutions at all
+                 ;; ↓ sucessively divide pnml by (x - r)
           (recur (:quotient (div pnml {1 1, 0 (- (first winners))}))
                  (into roots winners)))))))
 
-;; TODO: cyclotomic polynomials
-;; TODO: irreducible polynomials
+;; FACTORIZATION
+
+(defn content
+  "Returns the content of a polynomial (gcd of its coefficients) with either
+  integer or rational coefficients."
+  [pnml]
+  (let [coefs (vals pnml)]
+    (if (some ratio? coefs)
+      ;; ↓ rational coefficients: LCM of denominators of all coefficients
+      (let [d (reduce (fn [a b]
+                        (tower/lcm a (if (ratio? b) (denominator b) b)))
+                      1 coefs)
+            Q (mul pnml {0 d})]
+        (/ (content Q) d))
+      ;; ↓ all integer coefficients: GCD of coefficients
+      (let [sign (if (neg? (lc pnml)) -1 1)]
+        (* sign (reduce tower/gcd coefs))))))
+
+(defn ppc
+  "Returns the primitive part–content factorization of a polynomial."
+  [pnml]
+  (let [c (content pnml) pp (div pnml c)]
+    {:primitive-part pp :content c}))
+
+;; TODO: https://en.wikipedia.org/wiki/Factorization_of_polynomials#Modern_methods
+;; TODO: (irreducible? pnml)
