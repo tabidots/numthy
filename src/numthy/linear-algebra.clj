@@ -1,4 +1,4 @@
-(ns numthy.linalg)
+(ns numthy.linear-algebra)
 
 (defn transpose
   [matrix]
