@@ -1,7 +1,7 @@
 (ns numthy.polynomial
   (:require [clojure.string :refer [join]]
             [numthy.modular-arithmetic :refer [mod-inverse]]
-            [numthy.helpers :refer [prime? factors mobius]]
+            [numthy.helpers :refer [prime? factors]]
             [clojure.math.numeric-tower :as tower]))
 
 (comment
@@ -137,8 +137,8 @@
   ;; Source: https://medium.com/@sibu.it13/aks-primality-test-f184cf6365a1
   [pnml r]
   (poly-trim (reduce-kv (fn [res power coeff]
-                           (merge-with + res {(mod power r) coeff})
-                         {} pnml))))
+                           (merge-with + res {(mod power r) coeff}))
+                        {} pnml)))
 
 (comment
  "Compare times"

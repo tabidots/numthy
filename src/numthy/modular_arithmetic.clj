@@ -113,9 +113,10 @@
   Φ(p) (i.e., p - 1) is a primitive root mod p."
   ; https://stackoverflow.com/a/26636457/4210855
   [x p]
-  (let [phi (dec p)
-        pfs (filter h/prime? (h/factors phi))]
-    (not-any? #(= 1 (mod-pow x (/ phi %) p)) pfs)))
+  (when (> x 1)
+    (let [phi (dec p)
+          pfs (filter h/prime? (h/factors phi))]
+      (not-any? #(= 1 (mod-pow x (/ phi %) p)) pfs))))
 
 (defn cyclic?
   "Returns true if (ℤ/nℤ,×) ≅ C_Φ(n), i.e., the multiplicative group of
@@ -130,11 +131,11 @@
   a is coprime to n. a^0 ≡ 1 (mod n) for any n. "
   [a n]
   (when (coprime? a n)
-    (first (filter #(= 1 (mod-pow a % n)) (rest (range))))))
+    (first (h/pfilter #(= 1 (mod-pow a % n)) (rest (range))))))
 
 (comment
   "If we know we are dealing with ℤ/pℤ, this is faster."
-  (first (filter #(= 1 (mod-pow a % p)) (pollard-factorize (dec p)))))
+  (first (h/pfilter #(= 1 (mod-pow a % p)) (pollard-factorize (dec p)))))
 
 (comment
   "For multiplicative order, a quick way to find k for small n is to count
@@ -205,7 +206,7 @@
       ;; λ(n) is the least common multiple of the λ of each of its prime power factors
       (->> (h/prime-factorization n)
            frequencies
-           (map prime-power-carm)
+           (pmap prime-power-carm)
            (reduce tower/lcm)))))
 
 ;; TODO: discrete logarithm problem

@@ -11,11 +11,11 @@
   (if (zero? n) 0
     (let [eps 0.000000000000000000000000000000000000000001M]
       (loop [t (bigdec (tower/expt n (/ root)))] ;; rough initial approx
-        (let [ts  (repeat (- root 1) t)
+        (let [ts  (repeat (dec root) t)
               nxt (with-precision 100 (-> (/ n (reduce *' ts))
                                           (+ (reduce +' ts))
                                           (/ root)))]
-          (if (< (.abs (- nxt t)) eps) t
+          (if (< (.abs (dec nxt)) eps) t
             (recur nxt)))))))
 
 (defn nth-root-is-integer?
@@ -51,23 +51,28 @@
   "Naive version of Euler's totient function that only uses gcd, since
   the optimized version requires factoring n first."
   [n]
-  (count (filter #(= 1 (tower/gcd n %)) (range 1 n))))
+  (count (h/pfilter #(ma/coprime? % n) (range 1 n))))
+
+(defn p-every?
+  "Multi-core version of `every?`."
+  [pred coll]
+  (every? true? (pmap pred coll)))
 
 (defn aks-prime?
   "Uses the Agrawal–Kayal–Saxena primality test to determine if an integer n
   is prime. Returns true if prime, nil or false otherwise."
   [n]
   ;; 1. Check if n is a perfect power
-  (when-not (perfect-power? n)
+  (when-not (or (perfect-power? n) (even? n))
     ;; 2. Find the smallest r such that ord_r(n) > (log_2 n)^2.
     (let [log (-> (Math/log n) (/ (Math/log 2)) (tower/expt 2))
-          r   (first (keep (fn [r] (when-let [ord (ma/multiplicative-order n r)]
-                                     (when (> ord log) r)))
-                           (range)))
-          lim (min r (- n 1))]
+          r   (some (fn [r] (when-let [ord (ma/multiplicative-order n r)]
+                              (when (> ord log) r)))
+                    (drop 2 (range)))
+          lim (min r (dec n))]
       ;; 3. For all 2 ≤ a ≤ min(r, n−1), check that a does not divide n
-      ;; (composite if so)
-      (when (not-any? (partial h/divisible? n) (range 2 (inc lim)))
+      ;; (composite if so) [already took care of case where a=2 by returning nil for even n]
+      (when (not-any? #(h/divisible? n %) (range 3 (inc lim) 2))
         ;; 4. If n ≤ r, output prime.
         (if (<= n r) true
           (let [log2n (/ (Math/log n) (Math/log 2))
@@ -80,4 +85,7 @@
             ;; n is composite.
             ;; In other words, prime? = true iff (X+a)^n = (X^n)+a (mod X^r − 1,n)
             ;; for ALL a from 1 to lim
-            (every? (fn [a] (= (lhs a) (rhs a))) (range 1 lim))))))))
+            (p-every? (fn [a] (= (lhs a) (rhs a))) (range 1 lim))))))))
+
+;; TODO: Final step of AKS algorithm is nearly intractable, even for numbers that
+;; aren't that large. How to optimize it?

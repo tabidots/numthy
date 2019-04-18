@@ -2,6 +2,14 @@
   (:require [clojure.string :as s]
             [clojure.math.numeric-tower :as tower]))
 
+;; GENERAL UTILITIES
+
+(defn pfilter
+  "Like filter, except uses multiple cores. Useful for huge collections."
+  [pred coll]
+  (->> (pmap #(when (pred %) %) coll)
+       (remove nil?)))
+
 ;; PRIMALITY HELPERS
 
 (defn isqrt
@@ -172,7 +180,7 @@
   (->> (filter prime? (range (inc x)))
        (map #(*' (Math/floor (/ (Math/log x)
                                 (Math/log %)))
-                 (Math/log %)))
+                 (Math/log10 %)))
        (reduce +')))
 
 (defn von-mangoldt [n]
@@ -180,7 +188,7 @@
   ;; https://en.wikipedia.org/wiki/Von_Mangoldt_function
   (let [pf (prime-factorization n)]
     (if (= 1 (count (distinct pf)))
-      (Math/log (first pf))
+      (Math/log10 (first pf))
       0)))
 
 ;; SEQUENCES
