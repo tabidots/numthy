@@ -1,8 +1,9 @@
-(ns numthy.polynomial
+(ns numthy.polynomials.core
   (:require [clojure.string :refer [join]]
-            [numthy.modular-arithmetic :refer [mod-inverse]]
-            [numthy.helpers :refer [prime? factors]]
-            [clojure.math.numeric-tower :as tower]))
+            [numthy.modular-arithmetic.utils :refer [mod-inverse]]
+            [numthy.primes.is-prime :refer [prime?]]
+            [numthy.arithmetic-fns :refer [divisors]]
+            [clojure.math.numeric-tower :refer [abs lcm gcd]]))
 
 (comment
   "To use these functions, represent polynomials as maps with powers as keys
@@ -262,12 +263,13 @@
         (zero? discriminant) [(-> (- b) (/ (* 2 a)))]
         :else nil))))
 
+;; TODO: Does divisors generate the same results as factors?
 (defn- possible-roots
   "Uses the Rational Root Theorem to generate all possible rational roots of a polynomial."
   [pnml]
   (if-let [constant (get pnml 0)]
-    (->> (for [p (factors (tower/abs constant))
-               q (factors (tower/abs (lc pnml)))]
+    (->> (for [p (divisors (abs constant))
+               q (divisors (abs (lc pnml)))]
            [(/ p q) (- (/ p q))])
          (apply concat)
          (into (sorted-set)))
@@ -282,6 +284,7 @@
   "Finds all rational and quadratic roots of a polynomial of arbitrary degree.
   Cannot return more than two irrational roots. Returns nil if there are no
   such roots, or if the polynomial is of degree 0."
+  ;; https://courses.lumenlearning.com/waymakercollegealgebra/chapter/zeros-of-a-polynomial-function/
   [pnml]
   (loop [pnml  pnml
          roots (sorted-set)]
@@ -306,13 +309,13 @@
     (if (some ratio? coefs)
       ;; ↓ rational coefficients: LCM of denominators of all coefficients
       (let [d (reduce (fn [a b]
-                        (tower/lcm a (if (ratio? b) (denominator b) b)))
+                        (lcm a (if (ratio? b) (denominator b) b)))
                       1 coefs)
             Q (mul pnml {0 d})]
         (/ (content Q) d))
       ;; ↓ all integer coefficients: GCD of coefficients
       (let [sign (if (neg? (lc pnml)) -1 1)]
-        (* sign (reduce tower/gcd coefs))))))
+        (* sign (reduce gcd coefs))))))
 
 (defn ppc
   "Returns the primitive part–content factorization of a polynomial."

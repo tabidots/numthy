@@ -1,11 +1,9 @@
-(ns numthy.factorization
-  (:require [clojure.math.numeric-tower :as tower]
-            [numthy.quadratic-residue :as qr]
-            [numthy.helpers :as h]
+(ns numthy.factorization.dixon
+  (:require [clojure.math.numeric-tower :refer [gcd expt]]
+            [numthy.helpers :refer [divisible?]]
+            [numthy.primes.is-prime :refer [prime?]]
+            [numthy.modular-arithmetic.utils :refer [mod-pow mod-mul]]
             [numthy.linear-algebra :as linalg]))
-
-;; This currently contains only an implementation of Dixon's algorithm
-;; TODO: Quadratic sieve algorithm
 
 (defn- smoothness-bound
   "Ceiling of e ^ (1/2 sqrt(ln n ln ln n))."
@@ -16,13 +14,14 @@
 (defn- smooth?
   "Returns [exponent-vector] if n is smooth over the given list of primes."
   [primes n]
-  (loop [x n primes primes
+  (loop [x         n
+         primes    primes
          exponents (->> (map #(hash-map % 0) primes)
                         (reduce into (sorted-map)))]
     (when-let [k (first primes)] ;; "nils out" if there are no more primes; i.e., n is not b-smooth
       (cond
         (= 1 x)            (vec (vals exponents))
-        (h/divisible? x k) (recur (/ x k) primes (update exponents k inc))
+        (divisible? x k) (recur (/ x k) primes (update exponents k inc))
         :else              (recur x (rest primes) exponents)))))
 
 (defn- square?
@@ -37,13 +36,13 @@
 
 (defn- relations
   "Given a factor base (vector of primes) with B elements, accumulate B+1 values of z,
-  between sqrt(n) and n, s.t. z^2 - n is smooth over the factor base. Returns a hash-map
+  between sqrt(n) and n, s.t. z^2 mod n is smooth over the factor base. Returns a hash-map
   with the zs as a vector and the exponent vectors in a vector (effectively an exponent matrix).
   Returns nil if no relations found."
   [n factor-base]
   (let [r (->> (drop (Math/sqrt n) (range (inc n)))
                (keep (fn [z]
-                       (when-let [expv (smooth? factor-base (- (*' z z) n))]
+                       (when-let [expv (smooth? factor-base (mod-pow z 2 n))]
                          {:z z :expv expv})))
                (take (inc (count factor-base))))]
     (when (not-empty r)
@@ -111,7 +110,7 @@
   [x y n]
   (when (and (not= (mod x n) (mod y n))
              (= (mod (*' x x) n) (mod (*' y y) n)))
-    [(tower/gcd (+ x y) n) (tower/gcd (- x y) n)]))
+    [(gcd (+ x y) n) (gcd (- x y) n)]))
 
 (defn dixon-factorize
   "Uses Dixon's factorization algorithm to factorize a large integer n. Does not
@@ -121,7 +120,7 @@
   ;; With reference to https://crypto.stanford.edu/cs359c/17sp/projects/BrendonGo.pdf
   [n] ; try 16850989; 1078766140548460
   (let [B               (smoothness-bound n)
-        factor-base     (filter h/prime? (range B))]
+        factor-base     (filter prime? (range B))]
     (when-let [{zs :zs exponent-matrix :exponent-matrix} (relations n factor-base)]
       (let [congruent-sets  (->> exponent-matrix segregate-rows find-congruent-sets)
             x-y-pair        (fn [c-set]
@@ -131,13 +130,13 @@
                               ;; the values in the exponent vector.
                               (let [x (->> c-set
                                            (map #(get zs %))
-                                           (reduce *'))
+                                           (reduce (fn [a b] (mod-mul a b n))))
                                     y (->> c-set
                                            (mapv #(get exponent-matrix %))
                                            (apply map +)
                                            (map #(quot % 2))
-                                           (map (fn [b e] (tower/expt b e)) factor-base)
-                                           (reduce *'))]
+                                           (map (fn [b e] (expt b e)) factor-base)
+                                           (reduce (fn [a b] (mod-mul a b n))))]
                                 [x y]))]
         (->> (map x-y-pair congruent-sets)
              (mapcat (fn [[x y]] (find-factors x y n)))

@@ -1,8 +1,8 @@
-(ns numthy.modular-fibonacci
-  (:require [clojure.math.numeric-tower :as tower]
-            [numthy.helpers :as h]
-            [numthy.modular-arithmetic :as ma]
-            [numthy.quadratic-residue :as qr]))
+(ns numthy.modular-arithmetic.modular-fibonacci
+  (:require [numthy.primes.is-prime :refer [prime?]]
+            [numthy.arithmetic-fns :refer [divisors]]
+            [numthy.modular-arithmetic.primitive-roots :refer [powers-of-a-mod-n primitive-root?]]
+            [numthy.modular-arithmetic.quadratic-residue :as qr]))
 
 ;; First, some naïve implementations to explore the concepts in a more
 ;; understandable way. These will only work in reasonable time for small inputs.
@@ -13,8 +13,8 @@
   which means that not only do the powers of x mod p generate all values in
   (ℤ/pℤ,×), but x^n + x^(n+1) ≡ x^(n+2) mod p."
   [x p]
-  (when (ma/primitive-root? x p)
-    (let [ps (ma/powers-of-a-mod-n x p)]
+  (when (primitive-root? x p)
+    (let [ps (powers-of-a-mod-n x p)]
       (->> (map #(= (-> (+ %1 %2) (mod p)) %3)
                 ps (rest ps) (rest (rest ps)))
            (every? true?)))))
@@ -47,15 +47,15 @@
                   (nth k)))
             (begins-pisano-cycle? [k]
               (= [0N 1N] (kth-fib-pair k)))]
-      (when (and (h/prime? p)
+      (when (and (prime? p)
                  (contains? #{1 9} (mod p 10))
                  (begins-pisano-cycle? (dec p)))
         ;; Confirm (p-1) is shortest period by testing all factors of (p-1)
-        (not-any? begins-pisano-cycle? (drop-last (h/factors (dec p))))))))
+        (not-any? begins-pisano-cycle? (drop-last (divisors (dec p))))))))
 
 ;; TODO: https://en.wikipedia.org/wiki/Pisano_period#Generalizations
 
 (defn has-fib-prim-root?
   [p]
   (when-let [roots (qr/mod-quadratic-zeroes {2 1, 1 -1, 0 -1} p)]
-    (some #(ma/primitive-root? % p) roots)))
+    (some #(primitive-root? % p) roots)))

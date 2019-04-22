@@ -4,27 +4,27 @@
   [matrix]
   (apply mapv vector matrix))
 
-(defn row
+(defn- row
   [matrix idx]
   (get matrix idx))
 
-(defn column
+(defn- column
   [matrix idx]
   (mapv #(get % idx) matrix))
 
-(defn swap
+(defn- swap
   [matrix a b]
   (assoc matrix a (get matrix b) b (get matrix a)))
 
-(defn scale-row
+(defn- scale-row
   [row n]
   (mapv #(*' % n) row))
 
-(defn add-rows
+(defn- add-rows
   [a b]
   (mapv + a b))
 
-(defn find-pivot-row
+(defn- find-pivot-row
   "The index of the first row whose pivot is in the given column."
   [matrix col]
   (letfn [(pivot-index [row]
@@ -35,7 +35,7 @@
                            (when (= (pivot-index row) col) i))
                          matrix))))
 
-(defn make-row-have-pivot-1
+(defn- make-row-have-pivot-1
   "Scale a row by the inverse of its pivot (its first non-zero value),
   so that its pivot is 1."
   [row]
@@ -43,7 +43,7 @@
     (scale-row row (/ pivot))
     row))
 
-(defn zero-out-remaining-columns
+(defn- zero-out-remaining-columns
   "Applies add & scale row operations so that all entries in column #col-idx,
   apart from the one in row #row-idx are zero."
   [row-idx col-idx matrix]
@@ -101,7 +101,7 @@
               (reduce + (mapv * left-row b)))
             a))))
 
-(defn augment
+(defn- augment
   "Augmented matrix of a and b, where b is a vector."
   [a b]
   (mapv conj a b))

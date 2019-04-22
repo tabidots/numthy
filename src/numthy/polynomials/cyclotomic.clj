@@ -1,9 +1,11 @@
-(ns numthy.cyclotomic
-  (:require [numthy.polynomial :refer [mul div]]
-            [numthy.helpers :refer [prime? factors mobius]]))
+(ns numthy.polynomials.cyclotomic
+  (:require [numthy.polynomials.core :refer [mul div]]
+            [numthy.primes.is-prime :refer [prime?]]
+            [numthy.arithmetic-fns :refer [divisors mobius]]))
 
 ;; CYCLOTOMIC POLYNOMIALS
 ;; TODO: Figure out what these actually are and what can be done with them
+;; TODO: Does factors output the same result as divisors?
 
 (defn cyclotomic
   "Returns the nth cyclotomic polynomial, i.e., the unique irreducible polynomial
@@ -13,7 +15,7 @@
   [n]
   (when (pos? n)
     (if (= 1 n) {0 -1, 1 1}
-      (let [{top-roots 1 bot-roots -1} (group-by mobius (factors n))
+      (let [{top-roots 1 bot-roots -1} (group-by mobius (divisors n))
             top (reduce mul (map (fn [d] {(/ n d) -1, 0 1}) top-roots))
             bot (reduce mul (map (fn [d] {(/ n d) -1, 0 1}) bot-roots))]
         (:quotient (div top bot))))))
