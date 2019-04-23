@@ -1,5 +1,6 @@
 (ns numthy.factorization.properties
   (:require [clojure.math.numeric-tower :refer [expt]]
+            [numthy.primes.is-prime :refer [prime?]]
             [numthy.helpers :refer [divisible?]]
             [numthy.factorization.core :as f]))
 

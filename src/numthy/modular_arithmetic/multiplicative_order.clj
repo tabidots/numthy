@@ -24,7 +24,7 @@
 
 (defn ord-prime
   "If a is not a primitive root of a prime p, then ord_p(a) is the smallest remainder
-  of φ(p)/x, where x is a prime factor of φ(p), s.t. a^(φ(p)/x) ≡ 1 mod p.
+  of φ(p)/x, where x is a divisor of φ(p), s.t. a^(φ(p)/x) ≡ 1 mod p.
   If it is a primitive root, then ord_p(a) = φ(p)."
   [a p]
   (cond
@@ -32,11 +32,10 @@
     (= (mod a p) (dec p)) 2 ;; a ≡ -1 mod p → ord_p(a) = 2
     :else
     (let [phi (dec p)]
-      (or (->> (f/distinct-prime-factors phi)  ;; pfs go in ascending order, so
-               (map #(/ phi %))                ;; remainders will go in descending order
-               (filter #(= 1 (mod-pow a % p)))
-               first)
-          phi))))
+      (->> (f/prime-factors-with-multiplicity phi)
+           (reductions / phi)
+           (filter #(= 1 (mod-pow a % p)))
+           (apply min)))))
 
 (defn- ord-prime-power
   "Finds ord_q(a), where q is a prime power of the form p^n."

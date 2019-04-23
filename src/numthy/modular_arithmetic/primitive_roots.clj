@@ -2,7 +2,7 @@
   (:require [clojure.math.numeric-tower :refer [expt]]
             [numthy.helpers :refer [coprime? rand-num]]
             [numthy.modular-arithmetic.utils :refer [mod-pow odd-prime? odd-prime-power?]]
-            [numthy.modular-arithmetic.groups :refer [multiplicative-group]]
+            [numthy.modular-arithmetic.groups :refer [multiplicative-group cyclic?]]
             [numthy.factorization.core :as f]))
 
 (defn powers-of-a-mod-n
@@ -22,17 +22,20 @@
       (into (sorted-set) roots))))
 
 (defn primitive-root?
-  "Efficiently determines if x is a primitive root mod p, where p is prime > 2,
-  by leveraging the fact that ord_p(x) will always be Φ(p) or one of its divisors.
-  (To simplify further, Φ(p) = p - 1 for p prime.) If there is no prime divisor
-  of Φ(p) s.t. x^d ≡ 1 mod p, then ord_p(x) must be Φ(p) mod p, which means that
-  x is a primitive root mod p."
+  "Efficiently determines if x is a primitive root mod n by leveraging the fact
+  that ord_n(x) will always be Φ(n) or one of its divisors. If there is no prime
+  divisor of Φ(n) s.t. x^(Φ(n)/d) ≡ 1 mod n, then ord_n(x) must be Φ(n) mod n,
+  which means that x is a primitive root mod n."
   ; https://stackoverflow.com/a/26636457/4210855
-  [x p]
-  (when (and (> x 1) (odd-prime? p))
-    (let [phi (dec p)
-          pfs (f/distinct-prime-factors phi)]
-      (not-any? #(= 1 (mod-pow x (/ phi %) p)) pfs))))
+  [x n]
+  (when (< 1 x n)
+    (when-let [phi (cond
+                     (odd-prime? n)       (dec n)
+                     (and (cyclic? n)
+                          (coprime? x n)) (f/phi n)
+                     :else                nil)]
+      (let [pfs (f/distinct-prime-factors phi)]
+        (not-any? #(= 1 (mod-pow x (/ phi %) n)) pfs)))))
 
 (defn least-primitive-root
   "Given a prime p, finds the least integer 2 ≦ a < p, s.t. a^φ(p) ≡ 1 mod p."
@@ -77,7 +80,7 @@
 
 (defn- primitive-roots-prime-squared
   ;; http://courses.mai.liu.se/GU/TATA54/Lectures/lecture5.pdf
-  [[p k]]
+  [p]
   (let [n    (*' p p)
         lift (fn [a] (map #(+ a (* % p)) ;; a+tp for 0 ≦ t < p
                           (range p)))]
@@ -98,7 +101,7 @@
     :else
     (letfn [(lift [a e] (map #(+ a (* % (expt p e))) ;; a+t*p^e for 0 ≦ t < p
                              (range p)))]
-      (loop [j 2 roots (primitive-roots-prime-squared [p k])]
+      (loop [j 2 roots (primitive-roots-prime-squared p)]
         (if (= j k) roots
           (recur (inc j)
                  (reduce (fn [res r]                 ;; if a is a p.r. mod p^k, k ≧ 2
