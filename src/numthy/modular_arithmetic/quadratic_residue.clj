@@ -4,13 +4,12 @@
             [numthy.helpers :refer [coprime?]]
             [numthy.factorization.core :refer [pollard-factorize]]
             [numthy.polynomials.core :refer [degree]]
-            [numthy.p-adic :refer [p-adic-order]]
             [numthy.modular-arithmetic.primitive-roots :refer [primitive-roots]]))
 
 (defn legendre-symbol
   "Legendre symbol for odd prime moduli. Returns 1 if a is a quadratic residue mod p."
   [a p]
-  (when (odd-prime?)
+  (when (odd-prime? p)
     (let [pow (-> (- p 1) (/ 2))  ;; a^((p-1)/ 2) mod p
           sym (mod-pow a pow p)]
       (if (> sym 1) (- sym p)     ;; make all non-residues -1
@@ -85,6 +84,12 @@
         [(-> (- b) (+ msr-d) (* (mod-inverse (* 2 a) p)) (mod p))
          (-> (- b) (- msr-d) (* (mod-inverse (* 2 a) p)) (mod p))]))))
 
+(defn quadratic-residue?
+  "Tests if an integer a is a quadratic residue mod m; that is, if there is an
+           integer x s.t. x^2 ≡ a mod m."
+  [a m]
+  (= 1 (kronecker-symbol a m)))
+
 (defn quadratic-residues
   "Returns all quadratic residues mod m; that is, all integers x < m s.t. there is
   an integer q^2 ≡ x mod m."
@@ -95,5 +100,5 @@
          (cons 1)                 ;; where k even.
          (into (sorted-set)))
     (->> (range 1 m)
-         (filter #(= 1 (kronecker-symbol % 7)))
+         (filter #(quadratic-residue? % m))
          (into (sorted-set)))))

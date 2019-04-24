@@ -1,7 +1,9 @@
 (ns numthy.primes.is-prime
   (:require [numthy.helpers :refer [isqrt divisible?]]))
 
-(defn naive-prime? [n]
+(defn naive-prime?
+  "Simple primality testing by trial division of odd integers ≦ √n."
+  [n]
   (cond
     (<= n 1)  false
     (= n 2)   true

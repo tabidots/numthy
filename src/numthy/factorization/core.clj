@@ -2,8 +2,7 @@
   (:require [clojure.math.numeric-tower :refer [gcd expt]]
             [numthy.helpers :refer [rand-num]]
             [numthy.primes.is-prime :refer [prime?]]
-            [numthy.modular-arithmetic.utils :refer [mod-pow]]
-            [numthy.linear-algebra :as linalg]))
+            [numthy.modular-arithmetic.utils :refer [mod-pow]]))
 
 ;; TODO: Quadratic sieve algorithm
 
