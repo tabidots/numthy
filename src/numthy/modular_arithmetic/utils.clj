@@ -1,36 +1,15 @@
 (ns numthy.modular-arithmetic.utils
-  (:require [clojure.math.numeric-tower :refer [gcd]]
+  (:require [clojure.math.numeric-tower :refer [gcd expt]]
             [numthy.helpers :refer [pairwise-coprime?]]
             [numthy.perfect-powers :refer [perfect-powers]]))
 
-;; Modular multiplication and exponentiation basically use the same algorithm,
-;; with the only differences being the operation (+ or *) and initial result (0 or 1).
-
 (defn mod-mul
-  ;; Translated from https://www.geeksforgeeks.org/multiply-large-integers-under-large-modulo/
-  "Quickly calculates a * b % m. Useful when a and b are very large integers."
   [a b m]
-  (if (or (= m 1) (= a m)) 0
-    (loop [a (mod a m) b b res 0]
-      (if (zero? b) res
-        (recur (-> (+' a a) (mod m))
-               (.shiftRight (biginteger b) 1)
-               (if (odd? b)
-                 (-> (+' res a) (mod m))
-                 res))))))
+  (-> (*' a b) (mod m)))
 
 (defn mod-pow
-  ;; Adapted from https://en.wikipedia.org/wiki/Modular_exponentiation
-  "Quickly calculates a ^ b % m. Useful when a and b are very large integers."
-  [base exp m]
-  (if (or (= m 1) (= base m)) 0
-    (loop [base (mod base m) e exp res 1]
-      (if (zero? e) res
-        (recur (-> (*' base base) (mod m))
-               (.shiftRight (biginteger e) 1)
-               (if (odd? e)
-                 (-> (*' res base) (mod m))
-                 res))))))
+  [b e m]
+  (-> (expt b e) (mod m)))
 
 (defn- euclidean-gcd
   "Uses the Euclidean algorithm to find the greatest common divisor of a and b."

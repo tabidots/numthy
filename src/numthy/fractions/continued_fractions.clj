@@ -1,4 +1,4 @@
-(ns numthy.continued-fractions
+(ns numthy.fractions.continued-fractions
   (:require [clojure.math.numeric-tower :refer [sqrt]]))
 
 (defn rational-cfrac

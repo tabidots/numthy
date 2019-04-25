@@ -3,6 +3,7 @@
             [numthy.helpers :refer [divisible?]]
             [numthy.primes.is-prime :refer [prime?]]
             [numthy.modular-arithmetic.utils :refer [mod-pow mod-mul]]
+            [numthy.perfect-powers :refer [perfect-power?]]
             [numthy.linear-algebra :as linalg]))
 
 (defn- smoothness-bound
@@ -112,6 +113,16 @@
              (= (mod (*' x x) n) (mod (*' y y) n)))
     [(gcd (+ x y) n) (gcd (- x y) n)]))
 
+(defn good-candidate?
+  ;; http://micsymposium.org/mics_2011_proceedings/mics2011_submission_28.pdf
+  [n]
+  (when-not (or (.isProbablePrime (biginteger n) 5)
+                (->> (range 2 (Math/log10 n))
+                     (filter prime?)
+                     (some #(divisible? n %)))
+                (perfect-power? n))
+    n))
+
 (defn dixon-factorize
   "Uses Dixon's factorization algorithm to factorize a large integer n. Does not
   necessarily factorize n completely. Returns nil if no relations are found.
@@ -141,3 +152,6 @@
         (->> (map x-y-pair congruent-sets)
              (mapcat (fn [[x y]] (find-factors x y n)))
              (into (sorted-set)))))))
+
+; 8937589375383974823423423523590825823409839092390489038
+; 120778234802486146262478696264740889505538366113384987N

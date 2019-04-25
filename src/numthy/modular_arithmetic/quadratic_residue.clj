@@ -4,6 +4,7 @@
             [numthy.helpers :refer [coprime?]]
             [numthy.factorization.core :refer [pollard-factorize]]
             [numthy.polynomials.core :refer [degree]]
+            [numthy.p-adic :refer [p-adic-order]]
             [numthy.modular-arithmetic.primitive-roots :refer [primitive-roots]]))
 
 (defn legendre-symbol
