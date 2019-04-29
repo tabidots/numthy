@@ -1,7 +1,7 @@
 (ns numthy.factorization.core
   (:require [clojure.math.numeric-tower :refer [gcd abs]]
             [numthy.helpers :refer [rand-num]]
-            [numthy.primes.is-prime :refer [prime?]]
+            [numthy.primes.is-prime :refer [quick-prime?]]
             [numthy.modular-arithmetic.utils :refer [mod-pow]]))
 
 (defn- pollard-rho
@@ -24,10 +24,9 @@
   [n]
   (when (and (integer? n) (> n 1))
     (loop [n n res (sorted-map)]
-      (if (.isProbablePrime (biginteger n) 5)
+      (if (quick-prime? n)
         (merge-with + res {n 1})
-        (let [p (first (filter #(.isProbablePrime (biginteger %) 5)
-                               (repeatedly #(pollard-rho n))))]
+        (let [p (first (filter quick-prime? (repeatedly #(pollard-rho n))))]
           (recur (/ n p) (merge-with + res {p 1})))))))
 
 (defn distinct-prime-factors
@@ -57,3 +56,14 @@
   (->> (distinct-prime-factors n)
        (map #(- 1 (/ 1 %)))
        (reduce * n)))
+
+(comment
+  (defn good-candidate?
+    ;; http://micsymposium.org/mics_2011_proceedings/mics2011_submission_28.pdf
+    [n]
+    (when-not (or (.isProbablePrime (biginteger n) 5)
+                  (->> (range 2 (Math/log10 n))
+                       (filter prime?)
+                       (some #(divisible? n %)))
+                  (perfect-power? n))
+      n)))

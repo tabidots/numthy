@@ -17,6 +17,17 @@
 
 (def prime? (memoize naive-prime?))
 
+(defn quick-prime?
+  "Quick probabilistic + deterministic check for use in algorithms where
+  many numbers need to be checked rapidly, e.g., factorization algos.
+  Java's .isProbablePrime returns bizarre results for small numbers sometimes,
+  so this is a sure-fire way to avoid NullPointer exceptions deep in other pipelines."
+  [n]
+  (when (integer? n)  ;; Sanity check
+    (if (< n 1000) (prime? n)
+      (.isProbablePrime (biginteger n) 5))))
+
+
 ;; TODO: https://en.wikipedia.org/wiki/Quadratic_Frobenius_test
 ;; TODO: https://en.wikipedia.org/wiki/Pocklington_primality_test
 ;; TODO: https://en.wikipedia.org/wiki/Lucas_primality_test

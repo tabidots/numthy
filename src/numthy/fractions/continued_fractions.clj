@@ -1,5 +1,6 @@
 (ns numthy.fractions.continued-fractions
-  (:require [clojure.math.numeric-tower :refer [sqrt]]))
+  (:require [clojure.math.numeric-tower :refer [sqrt]]
+            [numthy.helpers :refer [isqrt]]))
 
 (defn rational-cfrac
   "Continued fraction representation of n, where n is a rational number.
@@ -21,12 +22,12 @@
 
 (defn sqrt-cfrac
   "Continued fraction representation of sqrt(n) where sqrt(n) is irrational.
-  Outputs the starting term and one complete period."
+  Outputs the starting term and one complete period. Works well up to int limit."
   ; http://www.maths.surrey.ac.uk/hosted-sites/R.Knott/Fibonacci/cfINTRO.html#section6.2.2
   [n]
   (when (and (int? n)
              (not (rational? (sqrt n))))           ; sanity check
-    (let [a (last (take-while #(<= (* % %) n) (range)))] ; a for "approximation"
+    (let [a (isqrt n)]
       (loop [top 0 bot 1 cf []]
         (let [q         (quot (+ a top) bot)
               conjugate (- (- top (* q bot)))
@@ -36,11 +37,26 @@
             (conj cf q (+ a conjugate))
             (recur conjugate denom (conj cf q))))))))
 
-(defn cfrac->decimal
-  "Converts a continued fraction representation to decimal."
+(defn ->number
+  "Converts a continued fraction representation to an integer or Ratio."
   [cf]
   (->> (reverse cf)
        (reduce (fn [prev-sum t] (+ t (/ 1 prev-sum))))))
+
+(defn c-step
+  [x [a b]]
+  (+ (* x a) b))
+
+(defn ->convergents
+  "Returns the rational convergents of a given continued fraction."
+  [cfc]
+  (loop [as cfc hs '(1 0) ks '(0 1)] ;; Reverse order because we are cons'ing
+    (if-let [a (first as)]
+      (recur (rest as)
+        (cons (c-step a (take 2 hs)) hs)
+        (cons (c-step a (take 2 ks)) ks))
+      (map / (drop 2 (reverse hs))
+           (drop 2 (reverse ks))))))
 
 (comment
 

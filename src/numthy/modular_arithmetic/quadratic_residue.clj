@@ -21,7 +21,7 @@
   a quadratic residue mod n."
   ;; https://en.wikipedia.org/wiki/Kronecker_symbol
   [a n]
-  (if-let [ls (legendre-symbol a n)] ls  ;; for prime moduli p > 2
+  (if-some [ls (legendre-symbol a n)] ls  ;; for prime moduli p > 2
     (reduce-kv (fn [res p e]
                  (let [x (if (> p 2)
                            (legendre-symbol a p)
@@ -87,13 +87,14 @@
 
 (defn quadratic-residue?
   "Tests if an integer a is a quadratic residue mod m; that is, if there is an
-           integer x s.t. x^2 ≡ a mod m."
+  integer x s.t. x^2 ≡ a mod m."
   [a m]
-  (= 1 (kronecker-symbol a m)))
+  (if (= m 2) true ;; All n are q.r. mod 2
+    (= 1 (kronecker-symbol a m))))
 
 (defn quadratic-residues
-  "Returns all quadratic residues mod m; that is, all integers x < m s.t. there is
-  an integer q^2 ≡ x mod m."
+  "Returns all quadratic residues mod m for any m > 2; that is, all integers
+  x < m s.t. there is an integer q^2 ≡ x mod m."
   [m]
   (if (odd-prime? m)
     (->> (primitive-roots m)      ;; https://math.stackexchange.com/a/588778

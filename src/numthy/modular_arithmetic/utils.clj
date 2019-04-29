@@ -1,6 +1,7 @@
 (ns numthy.modular-arithmetic.utils
   (:require [clojure.math.numeric-tower :refer [gcd expt]]
             [numthy.helpers :refer [pairwise-coprime?]]
+            [numthy.primes.is-prime :refer [quick-prime?]]
             [numthy.perfect-powers :refer [perfect-powers]]))
 
 (defn mod-mul
@@ -56,7 +57,7 @@
 
 (defn odd-prime?
   [n]
-  (and (> n 2) (integer? n) (.isProbablePrime (biginteger n) 5)))
+  (when (> n 2) (quick-prime? n)))
 
 (defn odd-prime-power?
   "Returns [p k] if n is an odd prime power, k > 0. Returns nil otherwise."

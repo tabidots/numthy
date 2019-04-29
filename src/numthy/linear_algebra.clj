@@ -1,4 +1,8 @@
-(ns numthy.linear-algebra)
+(ns numthy.linear-algebra
+  (:require [clojure.core.reducers :as r]
+            [clojure.core.matrix :as m]))
+
+(m/set-current-implementation :vectorz)
 
 (defn transpose
   [matrix]
@@ -10,7 +14,7 @@
 
 (defn- column
   [matrix idx]
-  (mapv #(get % idx) matrix))
+  (into [] (r/map #(get % idx) matrix)))
 
 (defn- swap
   [matrix a b]
@@ -18,11 +22,11 @@
 
 (defn- scale-row
   [row n]
-  (mapv #(*' % n) row))
+  (into [] (r/map #(*' % n) row)))
 
 (defn- add-rows
   [a b]
-  (mapv + a b))
+  (into [] (pmap #(+' ^BigInteger %1 %2) a b)))
 
 (defn- find-pivot-row
   "The index of the first row whose pivot is in the given column."
@@ -40,7 +44,7 @@
   so that its pivot is 1."
   [row]
   (if-let [pivot (some #(when-not (zero? %) %) row)]
-    (scale-row row (/ pivot))
+    (m/scale row (/ pivot))
     row))
 
 (defn- zero-out-remaining-columns
@@ -56,8 +60,10 @@
             pivot-row (row m row-idx)
             top       (- (get cur-row col-idx))
             bot       (get pivot-row col-idx)
-            scalar    (/ top bot)]
-        (recur (assoc m r (add-rows cur-row (scale-row pivot-row scalar)))
+            scalar    (/ (double top) bot)]
+        (recur (assoc m r (->> (m/scale pivot-row scalar)
+                               (m/add cur-row)
+                               (mapv #(Math/round %))))
                (inc r))))))
 
 (defn reduced-row-echelon
@@ -67,22 +73,23 @@
   (let [num-cols (count (first matrix))
         num-rows (count matrix)]
     (loop [m matrix target-row 0 target-col 0]
-      (let [pivot-row (find-pivot-row m target-col)
-            target-el (get-in m [target-row target-col])]
-        (cond
-          ;; Finished eliminating? Return the matrix
-          (= target-col num-cols) m
-          ;; No pivot row -> Column is all zeroes? Go to next column, but same row
-          (nil? pivot-row) (recur m target-row (inc target-col))
-          ;; Just this element is zero? Swap with next row that has a pivot in column at idx
-          (zero? target-el) (recur (swap m target-row pivot-row) target-row target-col)
-          ;; Has a pivot? Make that pivot 1 and zero out the remaining columns;
-          ;; Proceed to next column and row
-          :else
-          (recur (->> (assoc m pivot-row (make-row-have-pivot-1 (row m pivot-row)))
-                      (zero-out-remaining-columns pivot-row target-col))
-                 (inc target-row)
-                 (inc target-col)))))))
+      ;; Finished eliminating? Return the matrix
+      (if (or (= target-row num-rows)
+              (= target-col num-cols)) m
+        (let [pivot-row (find-pivot-row m target-col)
+              target-el (m/mget m target-row target-col)]
+          (cond
+            ;; No pivot row -> Column is all zeroes? Go to next column, but same row
+            (nil? pivot-row) (recur m target-row (inc target-col))
+            ;; Just this element is zero? Swap with next row that has a pivot in column at idx
+            (zero? target-el) (recur (m/swap-rows m target-row pivot-row) target-row target-col)
+            ;; Has a pivot? Make that pivot 1 and zero out the remaining columns;
+            ;; Proceed to next column and row
+            :else
+            (recur (->> (assoc m pivot-row (make-row-have-pivot-1 (row m pivot-row)))
+                        (zero-out-remaining-columns pivot-row target-col))
+                   (inc target-row)
+                   (inc target-col))))))))
 
 (defn mmul
   "Dot product of a and b, where b can be a matrix or vector."
@@ -93,12 +100,12 @@
       ;; b is matrix
       (reduce (fn [res left-row]
                 (conj res (mapv (fn [right-col]
-                                  (reduce + (mapv * left-row right-col)))
+                                  (reduce +' (mapv *' left-row right-col)))
                                 (transpose b)))) ;; right-cols = (transpose b)
               [] a)
       ;; b is vector
       (mapv (fn [left-row]
-              (reduce + (mapv * left-row b)))
+              (reduce +' (mapv *' left-row b)))
             a))))
 
 (defn- augment
@@ -112,6 +119,6 @@
   ;; With reference to https://textbooks.math.gatech.edu/ila/least-squares.html
   (let [ata  (mmul (transpose a) a)
         atb  (mmul (transpose a) b)
-        aug  (augment ata atb)
+        aug  (m/conjoin-along 1 ata atb)   ;(augment ata atb)
         rref (reduced-row-echelon aug)]
     (mapv last rref)))
