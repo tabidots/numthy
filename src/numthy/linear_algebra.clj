@@ -1,10 +1,12 @@
 (ns numthy.linear-algebra
+  "Matrix multiplication, Gauss-Jordan elimination, and linear least-squares in ℚ
+  with exact arithmetic; Gaussian elimination and linear equation solver over GF(2)."
   (:require [clojure.core.reducers :as r]
             [clojure.core.matrix :as m]))
 
 (m/set-current-implementation :vectorz)
 
-(defn transpose
+(defn- transpose
   [matrix]
   (apply mapv vector matrix))
 
@@ -67,8 +69,9 @@
                (inc r))))))
 
 (defn reduced-row-echelon
-  "Applies Gauss-Jordan elimination to returns the reduced-row echelon form
-  of the given matrix."
+  "Applies Gauss-Jordan elimination to return the reduced-row echelon form of
+  the given matrix. For large matrices, this will be very slow because of the repeated
+  division operations."
   [matrix]
   (let [num-cols (count (first matrix))
         num-rows (count matrix)]
@@ -94,26 +97,26 @@
                    (inc target-col))))))))
 
 (defn mmul
-  "Dot product of a and b, where b can be a matrix or vector."
-  [a b]
+  "Dot product of A and b, where b can be a matrix or vector."
+  [A b]
   ;; Rows on right have to equal cols on left
-  (when (= (count (first a)) (count b))
+  (when (= (count (first A)) (count b))
     (if (get-in b [0 0])
       ;; b is matrix
       (reduce (fn [res left-row]
                 (conj res (mapv (fn [right-col]
                                   (reduce + (mapv * left-row right-col)))
                                 (transpose b)))) ;; right-cols = (transpose b)
-              [] a)
+              [] A)
       ;; b is vector
       (mapv (fn [left-row]
               (reduce + (mapv * left-row b)))
-            a))))
+            A))))
 
 (defn- augment
-  "Augmented matrix of a and b, where b is a vector."
-  [a b]
-  (mapv conj a b))
+  "Augmented matrix of A and b, where A is a matrix and b is a vector."
+  [A b]
+  (mapv conj A b))
 
 (defn least-squares
   "Least-squares solution of Ax = b, where A is a matrix and b is a vector."
@@ -127,12 +130,13 @@
         rref (reduced-row-echelon aug)]
     (peek (m/columns rref))))    ;; (mapv peek rref) roughly same performance
 
-;; TODO: Make LA functions more mathematically rigorous based on
-;; http://www.math.tamu.edu/~julia/Teaching/find_bases_Narcowich.pdf
-
 ;; GF(2)-specific functions
 
 (defn- xor-rows
+  "XOR an origin row of a matrix in GF(2) to a destination row. If a column index
+  is supplied, then XOR will be applied only from that column rightwards, and the
+  old values to the left of that column will be kept. If no column index is supplied,
+  the whole row will be XOR'ed."
   ([origin destination]
    (xor-rows 0 origin destination))
   ([from-column origin destination]
@@ -140,6 +144,8 @@
                 (drop from-column (mapv #(bit-xor %1 %2) origin destination))))))
 
 (defn- zero-out-rest-of-column-gf2
+  "Given a pivot row and column, XORs the pivot row with all other rows having a
+  1 in that column, for all values in that column and rightwards."
   [row-idx col-idx matrix]
   (loop [m matrix
          r 0]
@@ -153,6 +159,7 @@
                    (inc r)))))
 
 (defn rref-gf2
+  "Uses Gaussian elimination to return the row-reduced echelon form of a matrix in GF(2)."
   [matrix]
   (let [num-cols (count (first matrix))
         num-rows (count matrix)]
@@ -184,6 +191,7 @@
   (def b [0,1,0,1,0,0,0,0,0,0]))
 
 (defn solve-gf2
+  "Solves Ax = b, where A is a matrix and b is a vector in GF(2)."
   [A b]
   (when (= (count A) (count b))
     (let [num-entries (count (first A))]
