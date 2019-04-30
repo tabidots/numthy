@@ -47,6 +47,14 @@
        (r/remove nil?)
        (into [])))
 
+(defn linearly-independent-idxs-gf2
+  [m]
+  (->> (m/transpose m)
+       (linalg/rref-gf2)
+       (r/map index-of-leading-1)
+       (r/remove nil?)
+       (into [])))
+
 (defn make-x-from-idxs
   [idxs zs n]
   (->> (m/order zs idxs)
@@ -83,7 +91,7 @@
         binary-expm      (mapv row->mod2 expm)
         ;; ↓ "To find the linearly independent rows of the exponent matrix,"
         ;; "we can get the RREF of the exponent matrix transposed"
-        independent-idxs (linearly-independent-idxs binary-expm)
+        independent-idxs (linearly-independent-idxs-gf2 binary-expm)
         At               (-> binary-expm
                              (m/order 0 (vec independent-idxs))
                              (m/transpose))]
@@ -92,11 +100,9 @@
                                (r/foldcat))]
       (if-let [d-idx (first dependent-idxs)]
         (let [b    (get binary-expm d-idx)
-              ;; Solve Ax = b for each dependent row b.
+              ;; Solve xA = b, that is A^T • x = b,  for each dependent row b.
               ;; Winners are a solution to the matrix equation Ax = b and look like [0 1 1 0 1]
-              ;_    (println "Solving least squares for Ax = row" d-idx "of" (count dependent-idxs))
-              idxs (->> (linalg/least-squares At b)
-                        (row->mod2)
+              idxs (->> (linalg/solve-gf2 At b) ; old: (row->mod2 (linalg/least-squares At b))
                         ;; If the independent indxs are [1 2 3 4 5] and winners are [0 1 1 0 1],
                         ;; then congruent indxs are [- 2 3 - 5] -> [2 3 5].
                         (keep-indexed (fn [i x] (when-not (zero? x)
@@ -106,7 +112,6 @@
                         (vec))
               x    (make-x-from-idxs idxs zs n)
               y    (make-y-from-idxs idxs expm factor-base n)
-              ;_    (println "Testing factor...")
               fact (gcd (+ x y) n)]
           (if (and (not= (mod x n) (mod y n)) (< 1 fact n)) fact
             (recur (rest dependent-idxs))))

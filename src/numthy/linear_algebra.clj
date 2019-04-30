@@ -16,17 +16,17 @@
   [matrix idx]
   (into [] (r/map #(get % idx) matrix)))
 
-(defn- swap
+(defn- swap ;; m/swap-rows seems a tiny bit faster
   [matrix a b]
   (assoc matrix a (get matrix b) b (get matrix a)))
 
 (defn- scale-row
   [row n]
-  (into [] (r/map #(*' % n) row)))
+  (into [] (r/map #(* % n) row)))
 
 (defn- add-rows
   [a b]
-  (into [] (pmap #(+' ^BigInteger %1 %2) a b)))
+  (into [] (pmap #(+ %1 %2) a b)))
 
 (defn- find-pivot-row
   "The index of the first row whose pivot is in the given column."
@@ -44,10 +44,10 @@
   so that its pivot is 1."
   [row]
   (if-let [pivot (some #(when-not (zero? %) %) row)]
-    (m/scale row (/ pivot))
+    (scale-row row (/ pivot))  ;; m/scale is a bit slower on native Clojure vectors
     row))
 
-(defn- zero-out-remaining-columns
+(defn- zero-out-rest-of-column
   "Applies add & scale row operations so that all entries in column #col-idx,
   apart from the one in row #row-idx are zero."
   [row-idx col-idx matrix]
@@ -60,10 +60,10 @@
             pivot-row (row m row-idx)
             top       (- (get cur-row col-idx))
             bot       (get pivot-row col-idx)
-            scalar    (/ (double top) bot)]
-        (recur (assoc m r (->> (m/scale pivot-row scalar)
-                               (m/add cur-row)
-                               (mapv #(Math/round %))))
+            scalar    (/ top bot)]
+        (recur (->> (scale-row pivot-row scalar) ;; m/scale is a bit slower on native Clojure vectors
+                    (m/add cur-row)
+                    (assoc m r)) ;; assoc seems to work much faster than m/set-row for native Clojure vectors
                (inc r))))))
 
 (defn reduced-row-echelon
@@ -86,8 +86,10 @@
             ;; Has a pivot? Make that pivot 1 and zero out the remaining columns;
             ;; Proceed to next column and row
             :else
-            (recur (->> (assoc m pivot-row (make-row-have-pivot-1 (row m pivot-row)))
-                        (zero-out-remaining-columns pivot-row target-col))
+            (recur (->> (row m pivot-row)
+                        (make-row-have-pivot-1)
+                        (assoc m pivot-row)     ;; assoc seems to work much faster than m/set-row for native Clojure vectors
+                        (zero-out-rest-of-column pivot-row target-col))
                    (inc target-row)
                    (inc target-col))))))))
 
@@ -100,12 +102,12 @@
       ;; b is matrix
       (reduce (fn [res left-row]
                 (conj res (mapv (fn [right-col]
-                                  (reduce +' (mapv *' left-row right-col)))
+                                  (reduce + (mapv * left-row right-col)))
                                 (transpose b)))) ;; right-cols = (transpose b)
               [] a)
       ;; b is vector
       (mapv (fn [left-row]
-              (reduce +' (mapv *' left-row b)))
+              (reduce + (mapv * left-row b)))
             a))))
 
 (defn- augment
@@ -115,10 +117,77 @@
 
 (defn least-squares
   "Least-squares solution of Ax = b, where A is a matrix and b is a vector."
-  [a b]
+  [A b]
   ;; With reference to https://textbooks.math.gatech.edu/ila/least-squares.html
-  (let [ata  (mmul (transpose a) a)
-        atb  (mmul (transpose a) b)
-        aug  (m/conjoin-along 1 ata atb)   ;(augment ata atb)
+  (let [at   (transpose A)
+        ata  (mmul at A)      ;; m/mmul is slow on Clojure vectors
+        atb  (mmul at b)      ;; m/mmul is slow on Clojure vectors
+        aug  (augment ata atb)   ;; (augment ata atb) roughly same performance
+        _    (println aug)
         rref (reduced-row-echelon aug)]
-    (mapv last rref)))
+    (peek (m/columns rref))))    ;; (mapv peek rref) roughly same performance
+
+;; TODO: Make LA functions more mathematically rigorous based on
+;; http://www.math.tamu.edu/~julia/Teaching/find_bases_Narcowich.pdf
+
+;; GF(2)-specific functions
+
+(defn- xor-rows
+  ([origin destination]
+   (xor-rows 0 origin destination))
+  ([from-column origin destination]
+   (vec (concat (take from-column destination)
+                (drop from-column (mapv #(bit-xor %1 %2) origin destination))))))
+
+(defn- zero-out-rest-of-column-gf2
+  [row-idx col-idx matrix]
+  (loop [m matrix
+         r 0]
+    (cond
+      (= r (count m)) m                ;; Finished all rows
+      (or (= r row-idx)
+          (zero? (m/mget m r col-idx))) (recur m (inc r))  ;; Ignore pivot & zero entries
+      :else (recur (->> (row m r)
+                        (xor-rows col-idx (row m row-idx))
+                        (assoc m r)) ;; assoc seems to work much faster than m/set-row for native Clojure vectors
+                   (inc r)))))
+
+(defn rref-gf2
+  [matrix]
+  (let [num-cols (count (first matrix))
+        num-rows (count matrix)]
+    (loop [m matrix target-row 0 target-col 0]
+      ;; Finished eliminating? Return the matrix
+      (if (or (= target-row num-rows)
+              (= target-col num-cols)) m
+        (let [pivot-row (find-pivot-row m target-col)
+              target-el (m/mget m target-row target-col)]
+          (cond
+            ;; No pivot row -> Column is all zeroes? Go to next column, but same row
+            (nil? pivot-row) (recur m target-row (inc target-col))
+            ;; Just this element is zero? Swap with next row that has a pivot in column at idx
+            (zero? target-el) (recur (m/swap-rows m target-row pivot-row) target-row target-col)
+            ;; Has a pivot? Make that pivot 1 and zero out the remaining columns;
+            ;; Proceed to next column and row
+            :else
+            (recur (zero-out-rest-of-column-gf2 pivot-row target-col m)
+                   (inc target-row)
+                   (inc target-col))))))))
+
+(comment
+  "Keep these as test cases"
+  (def A [[0 0 1 0 1 1 0 0 1 0]
+          [0 1 0 1 0 0 0 0 1 0]
+          [0 0 0 0 1 0 0 0 1 0]
+          [0 0 1 0 1 1 0 0 0 0]
+          [0 1 1 1 1 0 0 0 0 0]])
+  (def b [0,1,0,1,0,0,0,0,0,0]))
+
+(defn solve-gf2
+  [A b]
+  (when (= (count A) (count b))
+    (let [num-entries (count (first A))]
+      (->> (augment A b)
+           (rref-gf2)
+           (take num-entries) ;; because the result is zero-padded
+           (mapv peek)))))
