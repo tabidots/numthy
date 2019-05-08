@@ -3,7 +3,7 @@
   (:require [clojure.core.reducers :as r]
             [numthy.helpers :refer [isqrt]]
             [numthy.primes.is-prime :refer [prime?]]
-            [numthy.factorization.squares-utils :refer [smooth? smoothness-bound find-factor-from-congruent-relations]]
+            [numthy.factorization.squares-utils :refer [smooth? smoothness-bound find-factor]]
             [numthy.modular-arithmetic.utils :refer [mod-pow]]))
 
 (set! *unchecked-math* true)
@@ -16,13 +16,13 @@
   [n factor-base]
   (let [prime-map   (into (sorted-map) (zipmap factor-base (repeat 0)))
         z2-Bsmooth? (fn [z]
-                      (when-let [expv (some-> (mod-pow z 2 n)
-                                              (smooth? factor-base prime-map))]
-                        {z expv}))
-        relations   (->> (range (inc (isqrt n)) (inc n))
-                         (keep z2-Bsmooth?)
-                         (take (inc (count factor-base))))]
-    (apply merge relations)))
+                      (when-let [expv (-> (mod-pow z 2 n)
+                                          (smooth? factor-base prime-map))]
+                        {z expv}))]
+    (->> (range (inc (isqrt n)) (inc n))
+         (keep z2-Bsmooth?)
+         (take (inc (count factor-base)))
+         (apply merge))))
 
 (defn dixon-factorize
   "Uses Dixon's factorization algorithm to find at least one factor of n.
@@ -32,4 +32,4 @@
   (let [B           (smoothness-bound n)
         factor-base (filter prime? (range B))
         relations   (generate-relations n factor-base)]
-    (find-factor-from-congruent-relations n factor-base relations)))
+    (find-factor n factor-base relations)))

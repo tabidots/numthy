@@ -1,10 +1,9 @@
 (ns numthy.factorization.squares-utils
   "Workhorse functions for the family of congruence-of-squares factorization algorithms."
-  (:require [clojure.math.numeric-tower :refer [gcd expt]]
+  (:require [clojure.math.numeric-tower :refer [gcd expt abs]]
             [clojure.core.reducers :as r]
             [clojure.core.matrix :as m]
-            [numthy.helpers :refer [divisible?]]
-            [numthy.linear-algebra :as linalg]
+            [clojure.string :as s]
             [numthy.modular-arithmetic.utils :refer [mod-mul]]))
 
 (defn smoothness-bound
@@ -18,45 +17,82 @@
 (defn smooth?
   "Returns [exponent-vector] if n is smooth over the given empty hash-map of primes."
   [n primes prime-map]  ;; extra arg because iterating over keySeq is slow
-  (loop [x      n
+  (loop [x      (abs n)
          m      prime-map
          primes primes]
-    ;; TODO: Use an acc value to keep track of where we are in the primes vector.
-    ;;       Implement Early Abort Strategy.
-    ;;       https://books.google.com.vn/books?id=ITvaBwAAQBAJ&pg=PA202&lpg=PA202&dq=cfrac+multiplier+kn+%22continued+fraction%22+factorization+%22early+abort%22&source=bl&ots=6VvQXvUzSS&sig=ACfU3U0ldAojRlhZ_il97d_x9h_NF3Qp5g&hl=en&sa=X&ved=2ahUKEwj13N2ls_fhAhUQIIgKHWZ-B9EQ6AEwBXoECAkQAQ#v=onepage&q=cfrac%20multiplier%20kn%20%22continued%20fraction%22%20factorization%20%22early%20abort%22&f=false
     (if (= 1 x) (vec (vals m))
       (when-let [k (first primes)]
-        (if (zero? (mod x k))
-          (recur (/ x k) (update m k inc) primes)
-          (recur x m (rest primes)))))))
+        (cond
+          (neg? k)           (if (neg? n)
+                               (recur x (update m -1 inc) (rest primes))
+                               (recur x m (rest primes)))
+          (zero? (mod x k)) (recur (/ x k) (update m k inc) primes)
+          :else             (recur x m (rest primes)))))))
 
 (defn row->mod2
   "Given a vector, reduces all of its entries mod 2."
   [row]
   (mapv #(mod % 2) row))
 
-(defn index-of-leading-1
-  "Finds the index of the leading 1 in a row (vector). Returns nil if none."
-  [row]
-  (first (keep-indexed (fn [i x] (when (= 1 x) i)) row)))
-
-(defn linearly-independent-idxs
-  "Finds the subset of linearly independent rows in a matrix in ℚ."
+(defn gf2-matrix->column-wise-binary
+  "Encodes each column of a matrix in GF(2) as a binary number. Uses BigIntegers
+  to accommodate matrices of arbitrary numbers of columns and rows."
   [m]
-  (->> (m/transpose m)
-       (linalg/reduced-row-echelon)
-       (r/map index-of-leading-1)
-       (r/remove nil?)
-       (into [])))
+  (apply map (comp #(BigInteger. % 2)
+                   #(s/reverse %)
+                   #(reduce str %)
+                   vector)
+             m))
 
-(defn linearly-independent-idxs-gf2
-  "Finds the subset of linearly independent rows in a matrix over GF(2)."
+(comment
+ "Keep as test data"
+  (def m [[1 1 0 0]
+          [1 1 0 1]
+          [0 1 1 1]
+          [0 0 1 0]
+          [0 0 0 1]]))
+
+(defn- lowest-set-bit
+  "Finds the lowest set bit of a binary number. Only works for native Clojure numbers.
+  This function is left here for reference."
+  [a]
+  (when (pos? a)
+    (loop [b (.and a (- a)) low-bit -1]
+      (if (zero? b) low-bit
+        (recur (bit-shift-right b 1) (inc low-bit))))))
+
+(defn get-pivot
+  "Finds the pivot (first '1') in a binary-encoded column of a GF(2) matrix. Since
+  the columns are encoded so that the top entry of the column is the rightmost bit,
+  the first 1 is the lowest set bit of the number. When the pivot is -1, there is no
+  pivot, so returns nil. Uses Java interop to handle BigIntegers."
+  [n]
+  (let [lb (.getLowestSetBit n)]
+    (when-not (neg? lb)
+      (long lb))))
+
+(defn find-winning-subsets
+  "Uses Koç & Arachchige's algorithm to perform fast Gaussian elimination in GF(2) and
+  find all subsets of rows that add to the zero vector."
+  ;; With reference to https://github.com/skollmann/PyFactorise/blob/master/factorise.py
+  ;; Original paper: https://www.cs.umd.edu/~gasarch/TOPICS/factoring/fastgauss.pdf
   [m]
-  (->> (m/transpose m)
-       (linalg/rref-gf2)
-       (r/map index-of-leading-1)
-       (r/remove nil?)
-       (into [])))
+  (let [num-cols          (count (first m))
+        num-rows          (count m)
+        columns           (to-array (gf2-matrix->column-wise-binary m))
+        ^booleans marked? (boolean-array num-rows false)
+        ^longs    pivots  (long-array num-cols -1)]
+    (dotimes [j num-cols]
+             (when-some [i (get-pivot (aget columns j))]
+               (aset-long pivots j i)
+               (aset-boolean marked? i true)
+               (dotimes [k num-cols]
+                        (when (and (not= k j) (.testBit (aget columns k) i))
+                          (aset columns k (.xor (aget columns k) (aget columns j)))))))
+    (for [i (range num-rows) :when (not (aget ^booleans marked? i))]
+      (cons i
+            (for [j (range num-cols) :when (.testBit (aget columns j) i)]
+              (aget ^longs pivots j))))))
 
 (defn make-x-from-idxs
   "Given a list of indices, extracts the corresponding z-values from the candidates
@@ -79,35 +115,18 @@
                     (-> (expt b (quot e 2))
                         (mod-mul res n)))))))
 
-(defn find-factor-from-congruent-relations
+(defn find-factor
   "Separates a matrix of relations into linearly independent and dependent rows.
   For the submatrix of linearly independent rows A, and each dependent row b,
   solves the matrix equation Ax = b in GF(2) to find the vectors of the null space of A
   until a congruence of squares is found."
   [n factor-base relations]
-  (let [zs               (vec (keys relations))
-        expm             (vec (vals relations))
-        binary-expm      (mapv row->mod2 expm)
-        independent-idxs (linearly-independent-idxs-gf2 binary-expm)
-        At               (-> binary-expm
-                             (m/order 0 (vec independent-idxs))
-                             (m/transpose))]
-    (loop [dependent-idxs (->> (range (count expm))
-                               (r/remove (set independent-idxs))
-                               (r/foldcat))]
-      (if-let [d-idx (first dependent-idxs)]
-        (let [b    (get binary-expm d-idx)
-              ;; Solve xA = b, that is A^T • x = b,  for each dependent row b.
-              idxs (->> (linalg/solve-gf2 At b) ; old: (row->mod2 (linalg/least-squares At b))
-                        ;; Example: If the independent indxs are [1 2 3 4 5] and the solution is [0 1 1 0 1],
-                        ;; then congruent indxs are [- 2 3 - 5] -> [2 3 5].
-                        (keep-indexed (fn [i x] (when-not (zero? x)
-                                                  (get independent-idxs i))))
-                        (cons d-idx)   ;; Include the index for row b. e.g. (10 2 3 5) if solving for row 10
-                        (vec))
-              x    (make-x-from-idxs idxs zs n)
-              y    (make-y-from-idxs idxs expm factor-base n)
-              fact (gcd (+ x y) n)]
-          (if (and (not= (mod x n) (mod y n)) (< 1 fact n)) fact
-            (recur (rest dependent-idxs))))
-        "No factors found :("))))
+  (let [xs               (vec (keys relations))
+        exponent-vectors (vec (vals relations))
+        matrix           (mapv row->mod2 exponent-vectors)]
+    (->> (for [subset (find-winning-subsets matrix)]
+           (let [x (make-x-from-idxs subset xs n)
+                 y (make-y-from-idxs subset exponent-vectors factor-base n)]
+             (gcd (- x y) n)))
+         (filter #(< 1 % n))
+         (first))))

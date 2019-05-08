@@ -96,6 +96,20 @@
                    (inc target-row)
                    (inc target-col))))))))
 
+(defn index-of-leading-1
+  "Finds the index of the leading 1 in a row (vector). Returns nil if none."
+  [row]
+  (first (keep-indexed (fn [i x] (when (= 1 x) i)) row)))
+
+(defn linearly-independent-idxs
+  "Finds the subset of linearly independent rows in a matrix in ℚ."
+  [m]
+  (->> (m/transpose m)
+       (reduced-row-echelon)
+       (r/map index-of-leading-1)
+       (r/remove nil?)
+       (into [])))
+
 (defn mmul
   "Dot product of A and b, where b can be a matrix or vector."
   [A b]
@@ -126,7 +140,6 @@
         ata  (mmul at A)      ;; m/mmul is slow on Clojure vectors
         atb  (mmul at b)      ;; m/mmul is slow on Clojure vectors
         aug  (augment ata atb)   ;; (augment ata atb) roughly same performance
-        _    (println aug)
         rref (reduced-row-echelon aug)]
     (peek (m/columns rref))))    ;; (mapv peek rref) roughly same performance
 
@@ -189,6 +202,15 @@
           [0 0 1 0 1 1 0 0 0 0]
           [0 1 1 1 1 0 0 0 0 0]])
   (def b [0,1,0,1,0,0,0,0,0,0]))
+
+(defn linearly-independent-idxs-gf2
+  "Finds the subset of linearly independent rows in a matrix over GF(2)."
+  [m]
+  (->> (m/transpose m)
+       (rref-gf2)
+       (r/map index-of-leading-1)
+       (r/remove nil?)
+       (into [])))
 
 (defn solve-gf2
   "Solves Ax = b, where A is a matrix and b is a vector in GF(2)."

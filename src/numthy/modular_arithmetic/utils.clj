@@ -9,8 +9,9 @@
   (-> (*' a b) (mod m)))
 
 (defn mod-pow
+  "Wrapper around Java BigInteger.modPow(e, m)."
   [b e m]
-  (-> (expt b e) (mod m)))
+  (.modPow (biginteger b) (biginteger e) (biginteger m)))
 
 (defn- euclidean-gcd
   "Uses the Euclidean algorithm to find the greatest common divisor of a and b."
