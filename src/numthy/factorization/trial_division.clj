@@ -2,6 +2,7 @@
   "Batch trial division, gcd, and smooth-filtering functions based on algorithms by Dan Bernstein."
   (:require [clojure.math.numeric-tower :refer [abs expt gcd]]
             [clojure.core.reducers :as r]
+            [numthy.primes.is-prime :refer [quick-prime?]]
             [numthy.modular-arithmetic.utils :refer [mod-pow]]))
 
 (defn- product-tree
@@ -86,7 +87,7 @@
   that factor completely and the keys are the original candidates that produced those values.
   This function allows transducers that return nil."
   ;; Adapted from https://hal.inria.fr/inria-00188645v1/document
-  ([candidates primes]
+  ([primes candidates]
    (let [remainders (remainder-tree (fast-product primes) candidates)]
      (remove nil?
        (pmap (fn [rm cand]
@@ -94,15 +95,17 @@
                      ;; ↑ for each remainder z_i and candidate x_i, {z_i}^2^e where
                      ;; e is the smallest pos-int s.t. 2^2^e ≧ {x_i}
                      y (mod-pow rm (* 2 e) cand)]
-                   (when (= cand (gcd cand y)))))
+                 (when (= cand (gcd cand y))
+                   cand)))
              remainders candidates))))
-  ([raw-candidates xf primes]
+  ([primes xf raw-candidates]
    (let [[candidates x-candidates] ((juxt filter keep) xf raw-candidates)
-         remainders (remainder-tree (fast-product primes) candidates)]
+         remainders (remainder-tree (abs (fast-product primes)) (map abs x-candidates))]
      (apply merge
        (pmap (fn [rm cand x-cand]
-               (let [e (first (filter #(>= (expt 2 (* 2 %)) x-cand) (rest (range))))
-                     y (mod-pow rm (* 2 e) x-cand)]
-                (when (= x-cand (gcd x-cand y))
-                  {cand x-cand})))
-            remainders candidates x-candidates)))))
+               (let [axc (abs x-cand)
+                     e   (first (filter #(>= (expt 2 (* 2 %)) axc) (rest (range))))
+                     y   (mod-pow (abs rm) (* 2 e) axc)]
+                 (when (= axc (gcd axc y))
+                   {cand x-cand})))
+             remainders candidates x-candidates)))))
