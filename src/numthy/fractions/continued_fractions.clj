@@ -37,6 +37,18 @@
             (conj cf q (+ a conjugate))
             (recur conjugate denom (conj cf q))))))))
 
+(defn lazy-sqrt-cfrac
+  [n]
+  (let [a0 (isqrt n)
+        cfrac-next (fn [x]
+                     (when-some [[m d a] x]
+                       (when (or (zero? m) (> d 1))
+                         (let [m' (-> (* d a) (- m))
+                               d' (/ (- n (* m' m')) d)
+                               a' (quot (+ a0 m') d')]
+                           [m' d' a']))))]
+    (lazy-seq (map peek (iterate cfrac-next [0 1 a0])))))
+
 (defn ->number
   "Converts a continued fraction representation to an integer or Ratio."
   [cf]
@@ -57,6 +69,14 @@
         (cons (c-step a (take 2 ks)) ks))
       (map / (drop 2 (reverse hs))
            (drop 2 (reverse ks))))))
+
+;; TODO: More stuff from http://www.maths.surrey.ac.uk/hosted-sites/R.Knott/Fibonacci/cfINTRO.html
+;; http://www.maths.surrey.ac.uk/hosted-sites/R.Knott/Fibonacci/cfCALCbn.html
+
+;; https://en.wikipedia.org/wiki/Periodic_continued_fraction
+;; https://en.wikipedia.org/wiki/Quadratic_irrational_number
+;; https://en.wikipedia.org/wiki/Solving_quadratic_equations_with_continued_fractions
+;; https://en.wikipedia.org/wiki/Generalized_continued_fraction#Roots_of_positive_numbers
 
 (comment
 

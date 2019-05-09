@@ -1,8 +1,8 @@
 (ns numthy.factorization.squares-utils
   "Workhorse functions for the family of congruence-of-squares factorization algorithms."
-  (:require [clojure.math.numeric-tower :refer [gcd expt abs]]
-            [clojure.core.reducers :as r]
+  (:require [clojure.core.reducers :as r]
             [clojure.core.matrix :as m]
+            [clojure.math.numeric-tower :refer [gcd expt abs]]
             [clojure.string :as s]
             [numthy.modular-arithmetic.utils :refer [mod-mul]]))
 
@@ -14,25 +14,39 @@
   (-> (*' (Math/log n) (Math/log (Math/log n)))
       Math/sqrt (* 1/2) Math/exp))
 
-(defn smooth?
-  "Returns [exponent-vector] if n is smooth over the given empty hash-map of primes."
-  [n primes prime-map]  ;; extra arg because iterating over keySeq is slow
-  (loop [x      (abs n)
-         m      prime-map
-         primes primes]
-    (if (= 1 x) (vec (vals m))
-      (when-let [k (first primes)]
-        (cond
-          (neg? k)           (if (neg? n)
-                               (recur x (update m -1 inc) (rest primes))
-                               (recur x m (rest primes)))
-          (zero? (mod x k)) (recur (/ x k) (update m k inc) primes)
-          :else             (recur x m (rest primes)))))))
+(defn smooth-factorization
+  "Given an integer n, returns a map of the prime factors in primes that divide n
+  and their exponents. Does not check if n factors completely over the primes."
+  [n primes]
+  (let [n' (abs n)]
+    (->> (for [p primes]
+           (loop [x n' exp 0]
+             (cond
+               (neg? p)         (if (neg? n) {-1 1} {-1 0})
+               (pos? (mod x p)) {p exp}
+               :else            (recur (/ x p) (inc exp)))))
+         (apply merge))))
+
+(defn factorize-rhs
+  "Given a factor base and a hash-map of {x y} values where y is known to be
+  smooth over the factor base, returns {x m} where m is an unsorted map of the
+  prime factors of y and their exponents."
+  [factor-base m]
+  (reduce-kv (fn [relations x y]
+               (assoc relations x (smooth-factorization y factor-base)))
+             {} m))
 
 (defn row->mod2
   "Given a vector, reduces all of its entries mod 2."
   [row]
   (mapv #(mod % 2) row))
+
+(defn create-gf2-matrix
+  "Given a factor base and collection of unsorted exponent maps, creates a GF(2) matrix
+  (i.e., matrix where all entries are mod 2) from the maps."
+  [base ms]
+  (let [blank-map (into (sorted-map) (zipmap base (repeat 0)))]
+    (mapv (comp row->mod2 vals #(merge blank-map %)) ms)))
 
 (defn gf2-matrix->column-wise-binary
   "Encodes each column of a matrix in GF(2) as a binary number. Uses BigIntegers
@@ -94,39 +108,37 @@
             (for [j (range num-cols) :when (.testBit (aget columns j) i)]
               (aget ^longs pivots j))))))
 
-(defn make-x-from-idxs
+(defn make-x-from
   "Given a list of indices, extracts the corresponding z-values from the candidates
   and multiplies them together to give x."
   [idxs zs n]
   (->> (m/order zs idxs)
        (r/fold (fn ([] 1) ([a b] (mod-mul a b n))))))
 
-(defn make-y-from-idxs
-  "Given a list of indices, extracts the corresponding rows from the original
-  exponent matrix and adds their values (which is equivalent to multiplying the
-  integers they represent). This gives y^2. Then finds y by halving the entries
-  of the sum vector, and converting that back to an integer."
-  [idxs expm factor-base n]
+(defn make-y-from
+  "Given a list of indices, extracts the corresponding exponent map and adds their values
+  (which is equivalent to multiplying the integers they represent). This gives y^2.
+  Then finds y by halving the entries of the sum vector, and converting that back to an integer."
+  [idxs expm n]
   (->> (m/order expm idxs)
-       (apply m/add)
-       (zipmap factor-base)
+       (apply merge-with +)
        (r/fold (r/monoid (fn [a b] (mod-mul a b n)) (constantly 1))
-               (fn ([res b e]
-                    (-> (expt b (quot e 2))
-                        (mod-mul res n)))))))
+               (fn [res b e]
+                 (-> (expt b (quot e 2))
+                     (mod-mul res n))))))
 
 (defn find-factor
-  "Separates a matrix of relations into linearly independent and dependent rows.
-  For the submatrix of linearly independent rows A, and each dependent row b,
-  solves the matrix equation Ax = b in GF(2) to find the vectors of the null space of A
-  until a congruence of squares is found."
+  "Given a hash-map of relations in the form {x m} where m is an exponent map of y,
+  a transformed x-value, creates an exponent matrix over GF(2) from the maps of all ys,
+  and solves for its left null space to find subsets of rows that add to a square. Then
+  searches for a congruence of squares that yield a factor of n."
   [n factor-base relations]
-  (let [xs               (vec (keys relations))
-        exponent-vectors (vec (vals relations))
-        matrix           (mapv row->mod2 exponent-vectors)]
+  (let [xs            (vec (keys relations))
+        exponent-maps (vec (vals relations))
+        matrix        (create-gf2-matrix factor-base exponent-maps)]
     (->> (for [subset (find-winning-subsets matrix)]
-           (let [x (make-x-from-idxs subset xs n)
-                 y (make-y-from-idxs subset exponent-vectors factor-base n)]
+           (let [x (make-x-from subset xs n)
+                 y (make-y-from subset exponent-maps n)]
              (gcd (- x y) n)))
          (filter #(< 1 % n))
          (first))))
