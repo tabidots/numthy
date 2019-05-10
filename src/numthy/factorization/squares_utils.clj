@@ -97,16 +97,16 @@
         ^booleans marked? (boolean-array num-rows false)
         ^longs    pivots  (long-array num-cols -1)]
     (dotimes [j num-cols]
-             (when-some [i (get-pivot (aget columns j))]
-               (aset-long pivots j i)
-               (aset-boolean marked? i true)
-               (dotimes [k num-cols]
-                        (when (and (not= k j) (.testBit (aget columns k) i))
-                          (aset columns k (.xor (aget columns k) (aget columns j)))))))
+      (when-some [i (get-pivot (aget columns j))]
+        (aset-long pivots j i)
+        (aset-boolean marked? i true)
+        (dotimes [k num-cols]
+          (when (and (not= k j) (.testBit (aget columns k) i))
+            (aset columns k (.xor (aget columns k) (aget columns j)))))))
     (for [i (range num-rows) :when (not (aget ^booleans marked? i))]
       (cons i
-            (for [j (range num-cols) :when (.testBit (aget columns j) i)]
-              (aget ^longs pivots j))))))
+        (for [j (range num-cols) :when (.testBit (aget columns j) i)]
+          (aget ^longs pivots j))))))
 
 (defn make-x-from
   "Given a list of indices, extracts the corresponding z-values from the candidates

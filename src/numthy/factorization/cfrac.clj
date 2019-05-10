@@ -65,13 +65,13 @@
   ;; a little extra running time on smaller numbers.
   (let [residue-bound (* 2 (isqrt n))]
     (->> (partition 250 (sqrt-cfrac-numerators n))
-         (reduce (fn [smooths convergents]
-                   (if (> (count smooths) limit) (reduced smooths)
-                     (->> convergents
-                          (batch-smooth-filter factor-base #(->small-residue % n residue-bound))
-                          (factorize-rhs factor-base)
-                          (into smooths))))
-                 {}))))
+         (r/reduce (fn [smooths convergents]
+                     (if (> (count smooths) limit) (reduced smooths)
+                       (->> convergents
+                            (batch-smooth-filter factor-base #(->small-residue % n residue-bound))
+                            (factorize-rhs factor-base)
+                            (into smooths))))
+                   {}))))
 
 (defn cfrac
   "Uses the Brillhart-Morrison continued fraction factorization algorithm to find one
