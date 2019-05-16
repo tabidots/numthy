@@ -1,11 +1,15 @@
 (ns numthy.modular-arithmetic.quadratic-residue
   (:require [clojure.math.numeric-tower :refer [expt]]
-            [numthy.modular-arithmetic.utils :refer [mod-pow mod-inverse odd-prime?]]
+            [numthy.factorization.pollard :refer [brent-factorize]]
             [numthy.helpers :refer [coprime?]]
-            [numthy.factorization.core :refer [pollard-factorize]]
-            [numthy.polynomials.core :refer [degree]]
+            ;[numthy.modular-arithmetic.primitive-roots :refer [primitive-roots]]
+            [numthy.modular-arithmetic.utils :refer [mod-pow mod-inverse odd-prime?]]
             [numthy.p-adic :refer [p-adic-order]]
-            [numthy.modular-arithmetic.primitive-roots :refer [primitive-roots]]))
+            [numthy.polynomials.core :refer [degree]]
+            [numthy.primes.is-prime :refer [quick-prime?]]))
+
+(set! *unchecked-math* true)
+(set! *warn-on-reflection* true)
 
 (defn legendre-symbol
   "Legendre symbol for odd prime moduli. Returns 1 if a is a quadratic residue mod p."
@@ -28,17 +32,7 @@
                            (nth [0 1 0 -1 0 -1 0 1] (mod a 8)))]
                    (* res (expt x e))))
                (if (neg? a) -1 1)
-               (pollard-factorize n))))
-
-(defn perfect-power-of-2?
-  ;; Maybe this is useful for something?
-  [n]
-  (reduce (fn [a b]
-            (cond
-              (> a n) (reduced false)
-              (= a n) (reduced true)
-              :else   (* a b)))
-          (repeat 2)))
+               (brent-factorize n))))
 
 (defn- msqrt3-mod-4
   [a p]
@@ -101,7 +95,7 @@
 (defn mod-quadratic-zeroes
   "Returns the two solutions to any quadratic equation mod p, or nil if none."
   [pnml p]
-  (when (and (= 2 (degree pnml)) (.isProbablePrime (biginteger p) 5))
+  (when (and (= 2 (degree pnml)) (quick-prime? p))
     (let [{a 2, b 1, c 0} pnml
           discriminant    (-> (*' b b)
                               (- (* 4 a c)))]
@@ -118,15 +112,17 @@
   (if (= m 2) true ;; All n are q.r. mod 2
     (= 1 (kronecker-symbol a m))))
 
-(defn quadratic-residues
-  "Returns all quadratic residues mod m for any m > 2; that is, all integers
+(comment
+  "Commented out for now because it is causing a cyclic dependency."
+  (defn quadratic-residues
+    "Returns all quadratic residues mod m for any m > 2; that is, all integers
   x < m s.t. there is an integer q^2 ≡ x mod m."
-  [m]
-  (if (odd-prime? m)
-    (->> (primitive-roots m)      ;; https://math.stackexchange.com/a/588778
-         (map #(mod-pow % 2 m))   ;; if a is p.r. mod p, then a^k is q.r. mod p
-         (cons 1)                 ;; where k even.
-         (into (sorted-set)))
-    (->> (range 1 m)
-         (filter #(quadratic-residue? % m))
-         (into (sorted-set)))))
+    [m]
+    (if (odd-prime? m)
+      (->> (primitive-roots m)      ;; https://math.stackexchange.com/a/588778
+           (map #(mod-pow % 2 m))   ;; if a is p.r. mod p, then a^k is q.r. mod p
+           (cons 1)                 ;; where k even.
+           (into (sorted-set)))
+      (->> (range 1 m)
+           (filter #(quadratic-residue? % m))
+           (into (sorted-set))))))

@@ -1,10 +1,10 @@
 (ns numthy.modular-arithmetic.fast-primitive-roots
-  (:require [clojure.math.numeric-tower :refer [expt]]
-            [clojure.core.reducers :as r]
+  (:require [clojure.core.reducers :as r]
+            [clojure.math.numeric-tower :refer [expt]]
+            [numthy.factorization.core :refer [distinct-prime-factors phi]]
             [numthy.helpers :refer [coprime? rand-num]]
-            [numthy.modular-arithmetic.utils :refer [mod-pow odd-prime? odd-prime-power?]]
             [numthy.modular-arithmetic.groups :refer [multiplicative-group]]
-            [numthy.factorization.core :as f]))
+            [numthy.modular-arithmetic.utils :refer [mod-pow odd-prime? odd-prime-power?]]))
 
 ;; Rewriting the original primitive roots functions using clojure.core.reducers
 ;; Significant speedup, but only if the result is left as an unordered vector
@@ -13,17 +13,17 @@
   [p]
   (if (= p 2) 1
     (when (odd-prime? p)
-      (let [phi     (f/phi p);(dec p)
-            pfs     (f/distinct-prime-factors phi)
+      (let [phi'    (phi p);(dec p)
+            pfs     (distinct-prime-factors phi')
             p-root? (fn [a]
-                      (and (not-any? #(= 1 (mod-pow a (/ phi %) p)) pfs)))]
+                      (and (not-any? #(= 1 (mod-pow a (/ phi' %) p)) pfs)))]
         (first (filter p-root? (drop 2 (range))))))))
 
 (defn r-proots-prime
   [p]
-  (let [lpr (lpr-prime p) phi (f/phi p)]
-    (->> (range 1 phi)
-         (r/filter #(coprime? % phi))
+  (let [lpr (lpr-prime p) phi' (phi p)]
+    (->> (range 1 phi')
+         (r/filter #(coprime? % phi'))
          (r/map #(mod-pow lpr % p))
          (r/foldcat))))
 

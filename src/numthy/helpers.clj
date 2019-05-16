@@ -45,9 +45,11 @@
   ;; Java interop is super fast but not accurate for n > 1E24 (approx) due to
   ;; floating-point rounding. Uses a slightly slower but pinpoint-precise method for n > 1E24.
   [n]
-  (if (< n 1E24)
-    (-> (Math/sqrt n) bigint)
-    ;; https://cs.stackexchange.com/a/30383
+  (cond
+    (zero? n)  0
+    (neg? n)   nil
+    (< n 1E24) (-> (Math/sqrt n) bigint)
+    :else ;; https://cs.stackexchange.com/a/30383
     (let [half-bit-length (quot (.bitLength (bigint n)) 2)]
       (loop [a (expt 2 half-bit-length)
              b a
@@ -59,6 +61,16 @@
 
 (defn factorial [n]
   (reduce * (take n (iterate (partial inc) (bigint 1)))))
+
+(defn count-bits
+  "Counts the number of bits in an integer."
+  [n]
+  (.bitLength (biginteger n)))
+
+(defn count-digits
+  "Counts the number digits in an integer."
+  [n]
+  (inc (bigint (Math/log10 n))))
 
 ;;;;;;;;;
 

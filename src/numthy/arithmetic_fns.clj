@@ -1,9 +1,9 @@
 (ns numthy.arithmetic-fns
   (:require [clojure.math.combinatorics :refer [subsets]]
             [numthy.helpers :refer [isqrt divisible?]]
-            [numthy.primes.is-prime :refer [prime?]]
-            [numthy.factorization.core :as f]
-            [numthy.factorization.properties :refer [square-free?]]))
+            [numthy.factorization.core :refer [distinct-prime-factors prime-factors-with-multiplicity]]
+            [numthy.factorization.properties :refer [square-free?]]
+            [numthy.primes.is-prime :refer [prime?]]))
 
 (defn divisors-by-trial-division
   "Generates all proper divisors of a positive integer n (that is, all numbers < n
@@ -21,7 +21,7 @@
   Faster for large n (above ~500M)."
   [n]
   (if (= n 1) #{1}
-    (->> (f/prime-factors-with-multiplicity n)
+    (->> (prime-factors-with-multiplicity n)
          (subsets)
          (map #(reduce *' %))
          (drop-last)
@@ -48,7 +48,7 @@
 (defn von-mangoldt
   [n]
   ;; Λ(n) https://en.wikipedia.org/wiki/Von_Mangoldt_function
-  (let [pfs (f/distinct-prime-factors n)]
+  (let [pfs (distinct-prime-factors n)]
     (if (= 1 (count pfs))
       (Math/log10 (first pfs))
       0)))
@@ -56,5 +56,5 @@
 (defn mobius
   [n]
   (if (square-free? n)
-    (if (even? (count (f/distinct-prime-factors n))) 1 -1)
+    (if (even? (count (distinct-prime-factors n))) 1 -1)
     0))

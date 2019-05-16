@@ -1,10 +1,10 @@
 (ns numthy.modular-arithmetic.groups
   (:require [clojure.math.numeric-tower :refer [expt lcm]]
+            [numthy.factorization.core :refer [factorize phi]]
             [numthy.helpers :refer [coprime?]]
-            [numthy.primes.is-prime :refer [prime?]]
-            [numthy.perfect-powers :refer [perfect-powers]]
             [numthy.modular-arithmetic.utils :refer [mod-mul mod-pow odd-prime-power?]]
-            [numthy.factorization.core :as f]))
+            [numthy.perfect-powers :refer [perfect-powers]]
+            [numthy.primes.is-prime :refer [prime?]]))
 
 (defn complete-residue-system?
   "A complete residue system mod m is a set containing precisely one
@@ -64,17 +64,17 @@
               (cond
                 (and (odd? prime)
                      (= 1 power)) (dec prime) ;; speed up calculation
-                (odd? prime)      (f/phi (expt prime power))
-                (> power 2)       (/ (f/phi (expt prime power)) 2)
-                :else             (f/phi (expt prime power))))]
+                (odd? prime)      (phi (expt prime power))
+                (> power 2)       (/ (phi (expt prime power)) 2)
+                :else             (phi (expt prime power))))]
       ;; λ(n) is the least common multiple of the λ of each of its prime power factors
       (reduce-kv (fn [res prime power]
                    (lcm res (prime-power-carm prime power)))
-                 1 (f/pollard-factorize n)))))
+                 1 (factorize n)))))
 
 (comment
  "Alternative check for cyclic-ness"
- (= (f/phi n) (carmichael n)))
+ (= (phi n) (carmichael n)))
 
 ;; TODO: https://en.wikipedia.org/wiki/Carmichael_number
 ;; TODO: https://en.wikipedia.org/wiki/Euler_pseudoprime

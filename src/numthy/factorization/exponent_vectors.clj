@@ -2,7 +2,7 @@
   (:require [clojure.math.numeric-tower :refer [expt]]
             [numthy.primes.is-prime :refer [prime?]]
             [numthy.primes.sieves :as sv]
-            [numthy.factorization.core :refer [pollard-factorize]]))
+            [numthy.factorization.pollard :refer [brent-factorize]]))
 
 (defn exp-vec-integer
   "Returns the exponent vector for the prime power representation of an integer,
@@ -10,7 +10,7 @@
   [n]
   (when (and (integer? n) (pos? n))
     (if (= n 1) [0]
-      (let [pfs        (pollard-factorize n)
+      (let [pfs        (brent-factorize n)
             largest-pf (-> pfs keys sort last)]
         (->> (sv/primes-to (inc largest-pf))
              (mapv #(get pfs % 0)))))))
@@ -22,8 +22,8 @@
     ;; while still rejecting irrational numbers
     (when (or (ratio? q)
               (= (double r) (double q)))
-      (let [n          (pollard-factorize (numerator r))
-            d          (->> (pollard-factorize (denominator r))
+      (let [n          (brent-factorize (numerator r))
+            d          (->> (brent-factorize (denominator r))
                             (reduce-kv (fn [r k v] (assoc r k (- v))) {}))
             pfs        (merge-with + d n)
             largest-pf (-> pfs keys sort last)]

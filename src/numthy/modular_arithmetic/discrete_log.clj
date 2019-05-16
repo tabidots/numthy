@@ -1,18 +1,17 @@
 (ns numthy.modular-arithmetic.discrete-log
   (:require [clojure.math.numeric-tower :refer [expt]]
-            [numthy.modular-arithmetic.groups :as g]
-            [numthy.modular-arithmetic.utils :refer [mod-mul mod-pow mod-inverse odd-prime?
-                                                     chinese-remainder]]
+            [numthy.factorization.core :refer [factorize]]
+            [numthy.helpers :refer [coprime? isqrt]]
+            [numthy.modular-arithmetic.groups :refer [cyclic?]]
+            [numthy.modular-arithmetic.utils :refer [chinese-remainder mod-inverse mod-mul mod-pow odd-prime?]]
             [numthy.modular-arithmetic.primitive-roots :refer [primitive-root?]]
-            [numthy.modular-arithmetic.multiplicative-order :refer [multiplicative-order]]
-            [numthy.factorization.core :as f]
-            [numthy.helpers :refer [coprime? isqrt]]))
+            [numthy.modular-arithmetic.multiplicative-order :refer [multiplicative-order]]))
 
 (defn- brute-force
   "Brute-force search for x s.t. α^x ≡ β mod m. Returns nil if G = (ℤ/mℤ,×) is not
   cyclic, if β ∉ G, or if there is no solution."
   [α β m]
-  (when (and (g/cyclic? m) (coprime? β m))
+  (when (and (cyclic? m) (coprime? β m))
     (->> (rest (range m))
          (filter #(= β (mod-pow α % m)))
          first)))
@@ -130,7 +129,7 @@
         (try
           (->> (reduce-kv (fn [res q e]
                             (conj res (prime-factor->congruence α β p n q e)))
-                          [] (f/pollard-factorize n))
+                          [] (factorize n))
                (chinese-remainder))
           ;; discrete log does not necessarily exist for all intermediate a,b,p
           ;; in the congruence fn!

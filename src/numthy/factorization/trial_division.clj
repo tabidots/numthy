@@ -5,6 +5,9 @@
             [numthy.primes.is-prime :refer [quick-prime?]]
             [numthy.modular-arithmetic.utils :refer [mod-pow]]))
 
+(set! *unchecked-math* true)
+(set! *warn-on-reflection* true)
+
 (defn- product-tree
   "Iteratively consumes a collection of integers in pairs to find the product
   of the collection. For very large collections, this is much faster than (reduce * coll)."
@@ -19,7 +22,7 @@
   [coll]
   (first (peek (product-tree coll))))
 
-(defn- remainder-tree
+(defn remainder-tree
   "Walks down through the product tree of coll to find n mod x for every x in coll.
   For very large collections, this is faster than (map #(mod n %) coll)."
   ;; https://facthacks.cr.yp.to/remainder.html
@@ -105,7 +108,7 @@
        (pmap (fn [rm cand x-cand]
                (let [axc (abs x-cand)
                      e   (first (filter #(>= (expt 2 (* 2 %)) axc) (rest (range))))
-                     y   (mod-pow (abs rm) (* 2 e) axc)]
+                     y   (mod-pow rm (* 2 e) axc)]
                  (when (= axc (gcd axc y))
                    {cand x-cand})))
              remainders candidates x-candidates)))))

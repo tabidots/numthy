@@ -1,9 +1,9 @@
 (ns numthy.modular-arithmetic.multiplicative-order
   (:require [clojure.math.numeric-tower :refer [expt gcd lcm]]
+            [numthy.factorization.core :refer [factorize prime-factors-with-multiplicity]]
             [numthy.helpers :refer [coprime?]]
             [numthy.modular-arithmetic.utils :refer [mod-pow]]
-            [numthy.modular-arithmetic.primitive-roots :refer [powers-of-a-mod-n]]
-            [numthy.factorization.core :as f]))
+            [numthy.modular-arithmetic.primitive-roots :refer [powers-of-a-mod-n]]))
 
 (comment
   (defn naive-multiplicative-order
@@ -32,7 +32,7 @@
     (= (mod a p) (dec p)) 2 ;; a ≡ -1 mod p → ord_p(a) = 2
     :else
     (let [phi (dec p)]
-      (->> (f/prime-factors-with-multiplicity phi)
+      (->> (prime-factors-with-multiplicity phi)
            (reductions / phi)
            (filter #(= 1 (mod-pow a % p)))
            (apply min)))))
@@ -61,4 +61,4 @@
   (when (and (> a 1) (coprime? a m))
     (reduce-kv (fn [o p n]
                  (lcm o (ord-prime-power a p n)))
-               1 (f/pollard-factorize m))))
+               1 (factorize m))))

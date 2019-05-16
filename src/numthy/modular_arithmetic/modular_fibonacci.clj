@@ -35,25 +35,27 @@
         (if (and (> k 1) (= (map #(mod % n) fp) [0N 1N])) k
           (recur (next-pair fp) (inc k)))))))
 
-(defn naive-has-fib-prim-root?
-  "A prime p > 5 has at least one Fibonacci primitive root if it is ≡ 1 or 9 (mod 10)
+(comment
+  (defn naive-has-fib-prim-root?
+    "A prime p > 5 has at least one Fibonacci primitive root if it is ≡ 1 or 9 (mod 10)
   and its Pisano period is (p - 1). This shortcut minimizes the number of loops to find
   the shortest periodic sequence."
-  [p]
-  (if (= p 5) true ;; exception
-    (letfn [(kth-fib-pair [k] ;; the kth and k+1th Fib numbers mod p
-              (-> (iterate (fn [[f0 f1]]
-                             (map #(mod % p) [f1 (+ f0 f1)])) [0N 1N])
-                  (nth k)))
-            (begins-pisano-cycle? [k]
-              (= [0N 1N] (kth-fib-pair k)))]
-      (when (and (prime? p)
-                 (contains? #{1 9} (mod p 10))
-                 (begins-pisano-cycle? (dec p)))
-        ;; Confirm (p-1) is shortest period by testing all factors of (p-1)
-        (not-any? begins-pisano-cycle? (drop-last (divisors (dec p))))))))
+    [p]
+    (if (= p 5) true ;; exception
+      (letfn [(kth-fib-pair [k] ;; the kth and k+1th Fib numbers mod p
+                (-> (iterate (fn [[f0 f1]]
+                               (map #(mod % p) [f1 (+ f0 f1)])) [0N 1N])
+                    (nth k)))
+              (begins-pisano-cycle? [k]
+                (= [0N 1N] (kth-fib-pair k)))]
+        (when (and (prime? p)
+                   (contains? #{1 9} (mod p 10))
+                   (begins-pisano-cycle? (dec p)))
+          ;; Confirm (p-1) is shortest period by testing all factors of (p-1)
+          (not-any? begins-pisano-cycle? (drop-last (divisors (dec p)))))))))
 
 ;; TODO: https://en.wikipedia.org/wiki/Pisano_period#Generalizations
+;; https://www.mathstat.dal.ca/FQ/Scanned/15-4/deleon.pdf
 
 (defn has-fib-prim-root?
   [p]

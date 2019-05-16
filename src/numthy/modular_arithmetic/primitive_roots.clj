@@ -1,12 +1,14 @@
 (ns numthy.modular-arithmetic.primitive-roots
   (:require [clojure.math.numeric-tower :refer [expt]]
+            [numthy.factorization.core :refer [distinct-prime-factors phi]]
             [numthy.helpers :refer [coprime? rand-num]]
-            [numthy.modular-arithmetic.utils :refer [mod-pow odd-prime? odd-prime-power?]]
             [numthy.modular-arithmetic.groups :refer [multiplicative-group cyclic?]]
-            [numthy.factorization.core :as f]))
+            [numthy.modular-arithmetic.utils :refer [mod-pow odd-prime? odd-prime-power?]]))
+
+;; TODO: Rewrite all of these with reducers or Java arrays and benchmark the performance
 
 (defn powers-of-a-mod-n
-  "a^k (mod n) for all 0 ≦ k < n, where k ∈ ℤ."
+  "a^k (mod n) for all 0 ≤ k < n, where k ∈ ℤ."
   [a n]
   (map #(mod-pow a % n) (range n)))
 
@@ -29,24 +31,24 @@
   ; https://stackoverflow.com/a/26636457/4210855
   [x n]
   (when (< 1 x n)
-    (when-let [phi (cond
-                     (odd-prime? n)       (dec n)
-                     (and (cyclic? n)
-                          (coprime? x n)) (f/phi n)
-                     :else                nil)]
-      (let [pfs (f/distinct-prime-factors phi)]
-        (not-any? #(= 1 (mod-pow x (/ phi %) n)) pfs)))))
+    (when-let [phi' (cond
+                      (odd-prime? n)       (dec n)
+                      (and (cyclic? n)
+                           (coprime? x n)) (phi n)
+                      :else                nil)]
+      (let [pfs (distinct-prime-factors phi')]
+        (not-any? #(= 1 (mod-pow x (/ phi' %) n)) pfs)))))
 
 (defn least-primitive-root
-  "Given a prime p, finds the least integer 2 ≦ a < p, s.t. a^φ(p) ≡ 1 mod p."
+  "Given a prime p, finds the least integer 2 ≤ a < p, s.t. a^φ(p) ≡ 1 mod p."
   ;; https://math.stackexchange.com/a/133720
   [p]
   (if (= p 2) 1
     (when (odd-prime? p)
-      (let [phi     (f/phi p);(dec p)
-            pfs     (f/distinct-prime-factors phi)
+      (let [phi'    (phi p);(dec p)
+            pfs     (distinct-prime-factors phi')
             p-root? (fn [a]
-                      (and (not-any? #(= 1 (mod-pow a (/ phi %) p)) pfs)))]
+                      (and (not-any? #(= 1 (mod-pow a (/ phi' %) p)) pfs)))]
         (first (filter p-root? (drop 2 (range))))))))
 
 (defn random-primitive-root
@@ -62,9 +64,9 @@
   "The probability of choosing a primitive root mod n (n > 2) at random."
   [n]
   (when (> 2)
-    (let [phi (if (odd-prime? n) (dec n)
-                (f/phi n))]
-      (/ (f/phi phi) phi))))
+    (let [phi' (if (odd-prime? n) (dec n)
+                (phi n))]
+      (/ (phi phi') phi'))))
 
 (defn primitive-roots-prime
   "Uses the least primitive root of an odd prime p to find all other primitive roots."
@@ -72,9 +74,9 @@
   ;; if a is a primitive root mod p, a can generate all other remainders 1…(p−1) as powers.
   ;; a^m mod p is another primitive root iff m and p−1 are coprime.
   [p]
-  (let [lpr (least-primitive-root p) phi (f/phi p)]
-    (->> (range 1 phi)
-         (filter #(coprime? % phi))
+  (let [lpr (least-primitive-root p) phi' (phi p)]
+    (->> (range 1 phi')
+         (filter #(coprime? % phi'))
          (map #(mod-pow lpr % p))
          (into (sorted-set)))))
 

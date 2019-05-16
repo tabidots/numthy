@@ -5,8 +5,6 @@
 
 ;; CYCLOTOMIC POLYNOMIALS
 ;; TODO: Figure out what these actually are and what can be done with them
-;; TODO: Does factors output the same result as divisors?
-
 (defn cyclotomic
   "Returns the nth cyclotomic polynomial, i.e., the unique irreducible polynomial
   with integer coefficients that is a divisor of x^n - 1 and is not a divisor of

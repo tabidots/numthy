@@ -1,11 +1,18 @@
 (ns numthy.perfect-powers
-  (:require [clojure.math.numeric-tower :refer [expt]]))
+  (:require [clojure.math.numeric-tower :refer [expt]]
+            [numthy.helpers :refer [isqrt]]))
 
 (defn babylonian-root
   "High-precision BigDecimal nth-root using the Babylonian algorithm,
   with a close initial approximation for ridiculously fast convergence."
   [n root]
-  (if (zero? n) 0
+  (cond
+    (neg? n)     nil
+    (zero? n)    0
+    (= 1 n)      1
+    (zero? root) nil
+    (= 1 root)   n
+    :else
     (let [eps 0.000000000000000000000000000000000000000001M]
       (loop [t (bigdec (expt n (/ root)))] ;; rough initial approx
         (let [ts  (repeat (dec root) t)
@@ -17,16 +24,18 @@
 
 (defn nth-root-is-integer?
   "Tests if the nth root of x is an integer in the mathematical
-  (not programming) sense—i.e., if it is a whole number.)."
+  (not programming) sense—i.e., if it is a whole number."
   [x n]
-  (let [floor (bigint (Math/floor (babylonian-root x n)))
-        exp   (bigint (reduce *' (repeat n floor)))]
-    (when (= x exp) {floor n})))
+  (when-some [root (some-> (babylonian-root x n) bigint)]
+    (let [exp (bigint (reduce *' (repeat n root)))]
+      (when (= x exp) {root n}))))
 
 (defn perfect-square?
-  "Returns {sqrt(x) 2} if x is a perfect square, nil otherwise."
+  "Tests if x is a perfect square."
   [x]
-  (nth-root-is-integer? x 2))
+  (when-some [root (isqrt x)]
+    (when (= (*' root root) x)
+      {root 2})))
 
 (defn perfect-power?
   "If a^b = n for any pair of integers a, b > 1, returns [a b] for the smallest prime b,

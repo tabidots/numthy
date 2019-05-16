@@ -1,10 +1,10 @@
 (ns numthy.primes.aks
   (:require [clojure.math.numeric-tower :refer [sqrt expt]]
-            [numthy.modular-arithmetic.multiplicative-order :refer [multiplicative-order]]
+            [numthy.factorization.core :refer [phi]]
             [numthy.helpers :refer [divisible?]]
-            [numthy.polynomials.core :as p]
+            [numthy.modular-arithmetic.multiplicative-order :refer [multiplicative-order]]
             [numthy.perfect-powers :refer [perfect-power?]]
-            [numthy.factorization.core :refer [phi]]))
+            [numthy.polynomials.core :as p]))
 
 (defn p-every?
   "Multi-core version of `every?`."

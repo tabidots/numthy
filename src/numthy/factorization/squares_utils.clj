@@ -98,14 +98,14 @@
         ^longs    pivots  (long-array num-cols -1)]
     (dotimes [j num-cols]
       (when-some [i (get-pivot (aget columns j))]
-        (aset-long pivots j i)
-        (aset-boolean marked? i true)
+        (aset pivots j i)
+        (aset marked? i true)
         (dotimes [k num-cols]
-          (when (and (not= k j) (.testBit (aget columns k) i))
+          (when (and (not= k j) (.testBit (aget ^objects columns k) i))
             (aset columns k (.xor (aget columns k) (aget columns j)))))))
     (for [i (range num-rows) :when (not (aget ^booleans marked? i))]
       (cons i
-        (for [j (range num-cols) :when (.testBit (aget columns j) i)]
+        (for [j (range num-cols) :when (.testBit (aget ^objects columns j) i)]
           (aget ^longs pivots j))))))
 
 (defn make-x-from
@@ -136,9 +136,10 @@
   (let [xs            (vec (keys relations))
         exponent-maps (vec (vals relations))
         matrix        (create-gf2-matrix factor-base exponent-maps)]
-    (->> (for [subset (find-winning-subsets matrix)]
-           (let [x (make-x-from subset xs n)
-                 y (make-y-from subset exponent-maps n)]
-             (gcd (- x y) n)))
-         (filter #(< 1 % n))
-         (first))))
+    (when (> (count matrix) (count factor-base))
+      (->> (for [subset (find-winning-subsets matrix)]
+             (let [x (make-x-from subset xs n)
+                   y (make-y-from subset exponent-maps n)]
+               (gcd (- x y) n)))
+           (filter #(< 1 % n))
+           (first)))))
