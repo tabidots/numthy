@@ -27,7 +27,7 @@
 
 ;; UTILITY FUNCTIONS
 
-(defn- fast-legendre
+(defn fast-legendre
   "Short helper function extending the Legendre symbol to the case p = 2, and also
   without the primality test because the only numbers fed into this will be primes.
   Also omits the modulo wraparound, so returns 1 if a is a quadratic residue mod p,
@@ -75,7 +75,7 @@
          primes :primes} base
         sqrt2n           (isqrt (+' n n))
         sieve-radius     (* 60 (count primes))               ;; corresponds to "M"
-        max-gx           (-> (*' sieve-radius sqrt2n) (/ 2)) ;; maximum possible g(x)
+        max-gx           (*' sieve-radius (/ sqrt2n 2)) ;; maximum possible g(x)
         base-threshold   (* (Math/log10 max-gx) 0.735)
         quadratic-roots  (map-to #(or (msqrt n %)
                                       (if (odd? n) 1 0)) ;; safe for mod 2
@@ -146,7 +146,8 @@
            pnml            :polynomial
            threshold       :log-threshold
            M               :M}  state
-          ^doubles log-sums   (double-array (inc (* 2 M)) 0.0)] ;; 2M+1 = -M to M, incl. zero
+          ^doubles log-sums     (double-array (inc (* 2 M)) 0.0) ;; 2M+1 = -M to M, incl. zero
+          candidates            (transient [])]
       ;; Easy breezy approximate "trial division" through accumulation of logarithms of significant primes at
       ;; regular points throughout the interval as indicated by the modular square roots of those primes
       (doseq [p (filter #(>= % min-sig-prime) primes)] ;; See note about "Small Prime" variant above
@@ -158,17 +159,17 @@
             ;; This is an ugly but fast & efficient way to find starting point with only one mod calculation
             ;; start := (-M mod p) - s + p
             (loop [i (- p (- (mod (- M) p) s))]
-              (when (<= i (* 2 M))
-                (aset-double ^doubles log-sums i (+ (aget ^doubles log-sums i) logp))
-                (recur (+ i p)))))))
-      (->> (into []  ;; Using keep-indexed as a transducer is way faster than normal usage
-                 (keep-indexed (fn [i log-gx]
-                                 (when (> log-gx threshold)
-                                   (let [x (- i M)
-                                         gx (poly-eval pnml x)]
-                                     {:gx gx :x x}))))
-                 log-sums)
-           (assoc state :candidates)))))
+              (if (Thread/interrupted)
+                (throw (InterruptedException. "Interrupting MPQS..."))
+                (when (<= i (* 2 M))
+                  (aset ^doubles log-sums i (+ (aget ^doubles log-sums i) logp))
+                  (recur (+ i p))))))))
+      (dotimes [i (inc (* 2 M))] ;; This can be written functionally as keep-indexed, but is much slower
+        (let [log-gx (aget ^doubles log-sums i)]
+          (when (> log-gx threshold)
+            (let [x (- i M) gx (poly-eval pnml x)]
+              (conj! candidates {:gx gx :x x})))))
+      (assoc state :candidates (persistent! candidates)))))
 
 (declare check-smooth)
 
@@ -180,15 +181,12 @@
   (if (some? (:factor state)) state
     (let [{candidates :candidates primes :primes} state]
       (-> (reduce (fn [state' candidate]
-                    (->> (check-smooth state' candidate)
-                         (merge-with into state')))
+                    (if (Thread/interrupted)
+                      (throw (InterruptedException. "Interrupting MPQS..."))
+                      (->> (check-smooth state' candidate)
+                           (merge-with into state'))))
                   state candidates)
           (dissoc :candidates)))))
-
-(defn safe-xor
-  "XOR that treats a nonexistent value as 0."
-  [a b]
-  (bit-xor (or a 0) b))
 
 (defn common-factors
   "Finds common factors between two exponent maps."
@@ -225,7 +223,7 @@
               (when (= 1 (get exponent-map p)) ;; p is a square factor of gx'
                 (vswap! square-factors conj p))
               (vswap! used-primes conj p)
-              (recur (/ gx' p) primes (update exponent-map p safe-xor 1)))
+              (recur (/ gx' p) primes (update exponent-map p (fnil bit-xor 0) 1)))
             (recur gx' (rest primes) exponent-map))
           (if-some [partial (get partials gx')]
             ;; If no primes left, and another candidate shares the same remaining value,
@@ -291,14 +289,16 @@
   congruence of squares x and y s.t. gcd(x - y) mod n is a non-trivial factor of n."
   [state]
   (if (or (some? (:factor state)) (nil? (:matrix state))) state
-    (let [{n :n matrix :matrix smooths :smooths} state]
-      (->> (for [subset (find-winning-subsets matrix)]
-             (let [[x y] (->> (order (vec smooths) subset)
-                              ((juxt (comp make-x-from keys) (comp make-y-from vals))))]
-               (gcd (- x y) n)))
-           (filter #(< 1 % n))
-           (first)
-           (assoc state :factor)))))
+    (if (Thread/interrupted)
+      (throw (InterruptedException. "Interrupting MPQS..."))
+      (let [{n :n matrix :matrix smooths :smooths} state]
+        (->> (for [subset (find-winning-subsets matrix)]
+               (let [[x y] (->> (order (vec smooths) subset)
+                                ((juxt (comp make-x-from keys) (comp make-y-from vals))))]
+                 (gcd (- x y) n)))
+             (filter #(< 1 % n))
+             (first)
+             (assoc state :factor))))))
 
 (defn mpqs
   "Finds one prime factor of n using a Multiple-Polynomial Quadratic Sieve."
