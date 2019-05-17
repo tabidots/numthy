@@ -25,14 +25,13 @@
         (vswap! m update p (fnil inc 0))))
     {:remainder @n' :factors @m}))
 
-(defn- divide-out-small-factors
+(defn divide-out-small-factors
   "Divides out prime factors < 100000 from n, returning a map with the remainder and
   factorization."
   [n]
-  (do (println "1. Dividing out small factors...")
-    (->> (take-while #(<= % n) tdiv-primes)
-         (filter #(zero? (mod n %)))
-         (divide-out-factors n))))
+  (->> (take-while #(<= % n) tdiv-primes)
+       (filter #(zero? (mod n %)))
+       (divide-out-factors n)))
 
 (defn- divide-out-medium-factors
   "If n is still not completely factored after dividing out factors < 100000,
@@ -127,6 +126,7 @@
   "Uses the product rule to compute Euler's totient function of n, which the number of
   integers less than n that are coprime to it."
   [n]
-  (->> (distinct-prime-factors n)
-       (map #(- 1 (/ 1 %)))
-       (reduce * n)))
+  (if (quick-prime? n) (dec n)
+    (->> (distinct-prime-factors n)
+         (map #(- 1 (/ 1 %)))
+         (reduce * n))))
