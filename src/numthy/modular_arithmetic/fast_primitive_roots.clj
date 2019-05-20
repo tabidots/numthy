@@ -13,7 +13,7 @@
   [p]
   (if (= p 2) 1
     (when (odd-prime? p)
-      (let [phi'    (phi p);(dec p)
+      (let [phi'    (phi p)
             pfs     (distinct-prime-factors phi')
             p-root? (fn [a]
                       (and (not-any? #(= 1 (mod-pow a (/ phi' %) p)) pfs)))]

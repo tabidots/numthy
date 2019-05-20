@@ -14,6 +14,7 @@
 ;; http://webspace.ship.edu/msrenault/fibonacci/fib.htm
 ;; http://webspace.ship.edu/msrenault/fibonacci/fibfactory.htm
 ;; https://www.mathstat.dal.ca/FQ/Scanned/15-4/deleon.pdf
+;; https://sahandsaba.com/fibonacci-primitive-roots-project-euler.html
 
 (defn modular-fibonacci
   "Lazily generates the first c numbers of the Fibonacci sequence mod n."
@@ -47,7 +48,8 @@
   (when (> n 1)
     (loop [f0 1 f1 1 k 0] ;; start from F_1 to eliminate checking that k > 1 on every iteration
       (if (and (zero? f0) (= 1 f1)) (inc k) ;; we started 1 index ahead, so we have to inc the result
-        (recur (mod f1 n) (mod (+ f0 f1) n) (inc k))))))
+        ;; use long & rem to keep the compiler from complaining about auto-boxing loop args
+        (recur (long (rem f1 n)) (long (rem (+ f0 f1) n)) (inc k))))))
 
 (defn- naive-pisano-order
   "The number of zeroes in one Pisano period of n."
@@ -111,7 +113,8 @@
 (defn fibonacci-primitive-roots
   "The Fibonacci primitive roots mod p (p prime) are its primitive roots x s.t.
   x^2 - x - 1 ≡ 0 mod p. This is a reverse engineering of the Fibonacci sequence,
-  where 1 + x^1 ≡ x^2 mod p. Returns nil if there are no roots."
+  where 1 + x^1 ≡ x^2 mod p. Returns nil if there are no roots, so this can also
+  be used to test whether there are any FPRs mod p."
   [p]
   (when-let [roots (mod-quadratic-zeroes {2 1, 1 -1, 0 -1} p)]
     (not-empty (filter #(primitive-root? % p) roots))))
@@ -139,7 +142,9 @@
   "Efficiently determines whether p has at least one Fibonacci primitive root.
   Returns nil if p is not prime."
   [p]
-  (or (= p 5)
-      (and (quick-prime? p)
-           (contains? #{1 9} (mod p 10))
-           (= (dec p) (pisano-period p)))))
+  (if (> p 1000)
+    (fibonacci-primitive-roots p) ;; for p > 1000, this is faster
+    (or (= p 5)
+        (and (quick-prime? p)
+             (contains? #{1 9} (mod p 10))
+             (= (dec p) (pisano-period p))))))

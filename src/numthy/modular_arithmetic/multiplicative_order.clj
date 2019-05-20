@@ -22,7 +22,7 @@
 
 ;; Actual implementation
 
-(defn ord-prime
+(defn- ord-prime
   "If a is not a primitive root of a prime p, then ord_p(a) is the smallest remainder
   of φ(p)/x, where x is a divisor of φ(p), s.t. a^(φ(p)/x) ≡ 1 mod p.
   If it is a primitive root, then ord_p(a) = φ(p)."
